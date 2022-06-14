@@ -31,8 +31,8 @@ def main(args):
     else: 
         file_path = os.path.realpath(__file__)
         k = file_path.rfind("/")
-        model_folder_path = file_path[:k] + '/model_weights/'
-
+        model_folder_path = file_path[:k] + '/vanilla_model_weights/'
+    
     checkpoint_path = model_folder_path + f'{args.model_name}.pt'
     folder_for_outputs = args.out_folder
     
