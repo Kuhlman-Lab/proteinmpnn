@@ -39,8 +39,8 @@ class ProteinDesignInputFormatter(object):
                  symmetric_res: Optional[str] = None) -> None:
         self.CHAIN_IDS = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
         self.AA3 = ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 
-                    'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR']
-        self.AA1 = list('ACDEFGHIKLMNPQRSTVWY')
+                    'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR', 'XXX']
+        self.AA1 = list('ACDEFGHIKLMNPQRSTVWYX')
         self.AA3_to_AA1 = {aa3: aa1 for aa3, aa1 in zip(self.AA3, self.AA1)}
         
         if not os.path.isdir(pdb_dir):
@@ -49,6 +49,8 @@ class ProteinDesignInputFormatter(object):
             pdb_list = [file for file in os.listdir(pdb_dir) if file[-3:]=='pdb']
             if len(pdb_list) < 1:
                 raise ValueError(f'The pdb_dir {pdb_dir} does not contain any .pdb files.')
+            elif len(pdb_list) > 1:
+                raise ValueError(f'The pdb_dir {pdb_dir} contains more than 1 .pdb file. Currently this is not supported.')
             else:
                 self.pdb_dir = pdb_dir
                 self.pdb_list = pdb_list
@@ -59,12 +61,12 @@ class ProteinDesignInputFormatter(object):
         if designable_res:
             self.design_res = self.parse_designable_res(designable_res)
         else:
-            self.design_res = None
+            self.design_res = []
 
         if symmetric_res:
             self.symmetric_res = self.parse_symmetric_res(symmetric_res)
         else:
-            self.symmetric_res = None
+            self.symmetric_res = []
 
     def _check_res_validity(self, res_item: str) -> Tuple[str, int]:
         split_item = re.split('(\d+)', res_item)
@@ -173,10 +175,10 @@ class ProteinDesignInputFormatter(object):
                     pdbid = chain.id + str(num_id)
 
                     # Update dict with (residue name, residue chain, chain index)
-                    pdbids[pdbid] = (self.AA3_to_AA1[residue.get_resname()], chain.id, res_index_chain)
+                    pdbids[pdbid] = (self.AA3_to_AA1.get(residue.get_resname(), 'XXX'), chain.id, res_index_chain)
 
                     # Add to the chain_sequence
-                    chain_seqs[chain.id].append(self.AA3_to_AA1[residue.get_resname()])
+                    chain_seqs[chain.id].append(self.AA3_to_AA1.get(residue.get_resname(), 'XXX'))
 
                     # Update the chain index
                     res_index_chain += 1
