@@ -106,6 +106,7 @@ def run_protein_mpnn(args):
 
             # Generate some sequences
             ali_file = os.path.join(output_folder,  batch_clones[0]['name'] + '.fasta')
+            af2_file = os.path.join(output_folder, batch_clones[0]['name'] + '.csv')
             print(f'Generating sequences for: {name_}')
             t0 = time.time()
             with open(ali_file, 'w') as f:
@@ -156,6 +157,11 @@ def run_protein_mpnn(args):
                                 print_visible_chains = [visible_list_list[0][i] for i in sorted_visible_chain_letters]
                                 native_score_print = np.format_float_positional(np.float32(native_score.mean()), unique=False, precision=4)
                                 f.write('>{}, score={}, fixed_chains={}, designed_chains={}, model_name={}\n{}\n'.format(name_, native_score_print, print_visible_chains, print_masked_chains, args.model_name, native_seq)) #write the native sequence
+                                if args.af2_formatted_output:
+                                    with open(af2_file, 'w') as af2:
+                                        af2_seqs = native_seq.split('/')
+                                        af2_seqs = ','+','.join(af2_seqs)
+                                        af2.write(f'{af2_seqs} # {name_}, score={native_score_print}, fixed_chains={print_visible_chains}, designed_chains={print_masked_chains}, model_name={args.model_name}\n')
                             start = 0
                             end = 0
                             list_of_AAs = []
@@ -173,6 +179,11 @@ def run_protein_mpnn(args):
                             score_print = np.format_float_positional(np.float32(score), unique=False, precision=4)
                             seq_rec_print = np.format_float_positional(np.float32(seq_recovery_rate.detach().cpu().numpy()), unique=False, precision=4)
                             f.write('>T={}, sample={}, score={}, seq_recovery={}\n{}\n'.format(temp,b_ix,score_print,seq_rec_print,seq)) #write generated sequence
+                            if args.af2_formatted_output:
+                                with open(af2_file, 'a') as af2:
+                                    af2_seqs = seq.split('/')
+                                    af2_seqs = ','+','.join(af2_seqs)
+                                    af2.write(f'{af2_seqs} # T={temp}, sample={b_ix}, score={score_print}, seq_recovery={seq_rec_print}\n')
             t1 = time.time()
             dt = round(float(t1-t0), 4)
             num_seqs = len(temperatures)*NUM_BATCHES*BATCH_COPIES
@@ -193,6 +204,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_folder", type=str, help="Path to a folder to output sequences, e.g. /home/out/")
     parser.add_argument("--pdb_dir", type=str, default='', help="Path to a single PDB to be designed")
     parser.add_argument("--design_specs_json", type=str, help="Path to a folder with parsed pdb into jsonl")
+    parser.add_argument("--af2_formatted_output", action='store_true', help="Whether or not to include another output file that is in AF2 format for direct structure prediction after design.")
 
     args = parser.parse_args()    
     run_protein_mpnn(args) 
