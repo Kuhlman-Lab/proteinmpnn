@@ -1,9 +1,0 @@
---pdb_dir ./ # current directory
---backbone_noise 0.0
---num_seq_per_target 50
---batch_size 1
---sampling_temp 0.1 0.2 0.3
---out_folder outs
---design_specs_json proteinmpnn_res_specs.json
---model_name v_48_020
---af2_formatted_output

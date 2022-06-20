@@ -1,3 +1,0 @@
---pdb_dir ./ # current directory
---designable_res A49,A77,A153,A161,A162,A200,A310,A323,A391,A392,A49,B77,B153,B161,B162,B200,B310,B323,B391,B392
---symmetric_res A1-A394:B1-B394
