@@ -195,7 +195,7 @@ if __name__ == "__main__":
     parser = FileArgumentParser(description='Script that runs ProteinMPNN.', 
                                 fromfile_prefix_chars='@')
     
-    parser.add_argument("--model_name", type=str, default="v_48_020", help="ProteinMPNN model name: v_48_002, v_48_010, v_48_020, v_48_030; v_48_010=version with 48 edges 0.10A noise")
+    parser.add_argument("--model_name", type=str, default="v_48_020", help="ProteinMPNN model name: v_48_002, v_48_010, v_48_020, v_48_030, ca_48_002, ca_48_010, ca_48_020; v_48_010=version with 48 edges 0.10A noise")
     parser.add_argument("--backbone_noise", type=float, default=0.00, help="Standard deviation of Gaussian noise to add to backbone atoms")
     parser.add_argument("--num_seq_per_target", type=int, default=1, help="Number of sequences to generate per target")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size; can set higher for titan, quadro GPUs, reduce this if running out of GPU memory")
