@@ -1,14 +1,13 @@
 import argparse
+from dateutil import parser
+import numpy as np
+import os, time, gzip, json
+import glob 
 
-def main(args):
-
-    from dateutil import parser
-    import numpy as np
-    import os, time, gzip, json
-    import glob 
+def main(input_path, output_path, ca):
     
-    folder_with_pdbs_path = args.input_path
-    save_path = args.output_path
+    folder_with_pdbs_path = input_path
+    save_path = output_path
     
     alpha_1 = list("ARNDCQEGHILKMFPSTWYV-")
     states = len(alpha_1)
@@ -120,7 +119,7 @@ def main(args):
         concat_mask = []
         coords_dict = {}
         for letter in chain_alphabet:
-            if args.ca:
+            if ca:
                 xyz, seq = parse_PDB_biounits(biounit, atoms=['CA'], chain=letter)
                 if type(xyz) != str:
                     concat_seq += seq[0]
@@ -148,8 +147,10 @@ def main(args):
         if s < len(chain_alphabet):
             pdb_dict_list.append(my_dict)
             c+=1
-            
-            
+    
+    return save_path, pdb_dict_list
+
+def do_write(save_path, pdb_dict_list):      
     with open(save_path, 'w') as f:
         for entry in pdb_dict_list:
             f.write(json.dumps(entry) + '\n')
@@ -163,4 +164,4 @@ if __name__ == "__main__":
     argparser.add_argument("--ca", type=bool, help="Whether or not to use the CA-only models.")
 
     args = argparser.parse_args()
-    main(args)
+    do_write(*main(**args))
