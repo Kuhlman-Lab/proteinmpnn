@@ -6,3 +6,4 @@
 --out_folder outs
 --design_specs_json proteinmpnn_res_specs.json
 --model_name v_48_020
+--af2_formatted_output
