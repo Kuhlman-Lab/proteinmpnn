@@ -1,20 +1,22 @@
 import argparse
+import json
 
-def main(args):
-    import glob
-    import random
-    import numpy as np
-    import json
-    import itertools
-    
-    with open(args.input_path, 'r') as json_file:
+def get_json_list(input_path):
+    with open(input_path, 'r') as json_file:
         json_list = list(json_file)
-    
-    fixed_list = [[int(item) for item in one.split()] for one in args.position_list.split(",")]
-    global_designed_chain_list = [str(item) for item in args.chain_list.split()]    
-    my_dict = {}
+
+    dict_list = []
     for json_str in json_list:
-        result = json.loads(json_str)
+        dict_list.append(json.loads(json_str))
+
+    return dict_list
+
+def main(json_list, position_list, chain_list):
+    
+    fixed_list = [[int(item) for item in one.split()] for one in position_list.split(",")]
+    global_designed_chain_list = [str(item) for item in chain_list.split()]    
+    my_dict = {}
+    for result in json_list:
         all_chain_list = [item[-1:] for item in list(result) if item[:9]=='seq_chain']
         fixed_position_dict = {}
         for i, chain in enumerate(global_designed_chain_list):
@@ -24,7 +26,10 @@ def main(args):
                 fixed_position_dict[chain] = []
         my_dict[result['name']] = fixed_position_dict
     
-    with open(args.output_path, 'w') as f:
+    return my_dict
+
+def write_json(output_path, my_dict):
+    with open(output_path, 'w') as f:
         f.write(json.dumps(my_dict) + '\n')
     
     #e.g. output
@@ -38,5 +43,7 @@ if __name__ == "__main__":
     argparser.add_argument("--position_list", type=str, default='', help="Position lists, e.g. 11 12 14 18, 1 2 3 4 for first chain and the second chain")
 
     args = argparser.parse_args()
-    main(args)
+    json_list = get_json_list(args.input_path)
+    my_dict = main(json_list, args.position_list, args.chain_list)
+    write_json(args.output_path, my_dict)
 
