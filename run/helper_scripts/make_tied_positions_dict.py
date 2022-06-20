@@ -1,24 +1,26 @@
 import argparse
+import json
+from turtle import pos
 
-def main(args):
-
-    import glob
-    import random
-    import numpy as np
-    import json
-    import itertools
-    
-    with open(args.input_path, 'r') as json_file:
+def get_json_list(input_path):
+    with open(input_path, 'r') as json_file:
         json_list = list(json_file)
+
+    dict_list = []
+    for json_str in json_list:
+        dict_list.append(json.loads(json_str))
+
+    return dict_list
+
+def main(json_list, homooligomer, position_list, chain_list):
     
-    homooligomeric_state = args.homooligomer
+    homooligomeric_state = homooligomer
 
     if homooligomeric_state == 0:
-        tied_list = [[int(item) for item in one.split()] for one in args.position_list.split(",")]
-        global_designed_chain_list = [str(item) for item in args.chain_list.split()]
+        tied_list = [[int(item) for item in one.split()] for one in position_list.split(",")]
+        global_designed_chain_list = [str(item) for item in chain_list.split()]
         my_dict = {}
-        for json_str in json_list:
-            result = json.loads(json_str)
+        for result in json_list:
             all_chain_list = sorted([item[-1:] for item in list(result) if item[:9]=='seq_chain']) #A, B, C, ...
             tied_positions_list = []
             for i, pos in enumerate(tied_list[0]):
@@ -29,8 +31,7 @@ def main(args):
             my_dict[result['name']] = tied_positions_list
     else:
         my_dict = {}
-        for json_str in json_list:
-            result = json.loads(json_str)
+        for result in json_list:
             all_chain_list = sorted([item[-1:] for item in list(result) if item[:9]=='seq_chain']) #A, B, C, ...
             tied_positions_list = []
             chain_length = len(result[f"seq_chain_{all_chain_list[0]}"])
@@ -40,8 +41,11 @@ def main(args):
                     temp_dict[chain] = [i] #needs to be a list
                 tied_positions_list.append(temp_dict)
             my_dict[result['name']] = tied_positions_list
+
+    return my_dict
  
-    with open(args.output_path, 'w') as f:
+def write_json(output_path, my_dict):
+    with open(output_path, 'w') as f:
         f.write(json.dumps(my_dict) + '\n')
 
 if __name__ == "__main__":
@@ -53,7 +57,9 @@ if __name__ == "__main__":
     argparser.add_argument("--homooligomer", type=int, default=0, help="If 0 do not use, if 1 then design homooligomer")
 
     args = argparser.parse_args()
-    main(args)
+    json_list = get_json_list(args.input_path)
+    my_dict = main(json_list, args.homooligomer, args.position_list, args.chain_list)
+    write_json(args.output_path, my_dict)
 
 
 #e.g. output
