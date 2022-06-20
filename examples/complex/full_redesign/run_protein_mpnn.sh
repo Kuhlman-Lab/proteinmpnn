@@ -11,8 +11,8 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=user@email.com
 
-#source ~/.bashrc
-#conda activate mpnn
+source ~/.bashrc
+conda activate mpnn
 
 python ../../../run/generate_json.py @json.flags
 
