@@ -1,22 +1,14 @@
 from __future__ import print_function
-import json, time, os, sys, glob
-import shutil
+import json, time, os
 import numpy as np
 import torch
-from torch import optim
-from torch.utils.data import DataLoader
 from torch.utils.data.dataset import random_split, Subset
 
-import copy
 import torch.nn as nn
 import torch.nn.functional as F
-import random
 import itertools
 
-#A number of functions/classes are adopted from: https://github.com/jingraham/neurips19-graph-protein-design
-MODEL_CONFIG = {'hidden_dim': 128,
-                'num_layers': 3}
-
+# A number of functions/classes are adopted from: https://github.com/jingraham/neurips19-graph-protein-design
 
 def _scores(S, log_probs, mask):
     """ Negative log probabilities """
