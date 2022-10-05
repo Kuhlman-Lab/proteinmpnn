@@ -17,7 +17,24 @@ def determine_weight_directory() -> str:
     return weight_path
 
 
-def predict_stability(model, protein, chain_id_dict, batch_copies, num_batches, device):
+def place_mutant_order(randn, mut_idx, last=False):
+
+    # Create random order
+    decoding_order = torch.argsort(torch.abs(randn))
+
+    # Determine which order to look for
+    order = randn.shape[-1] - 1 if last else 0
+
+    # Update current order res to mutant's index
+    decoding_order[:, torch.argmax((decoding_order == order).int(), dim=-1)] = decoding_order[:, [mut_idx] * randn.shape[0]]
+
+    # Update mutant to order res
+    decoding_order[:, [mut_idx] * randn.shape[0]] = order
+
+    return decoding_order
+
+
+def predict_stability(model, protein, chain_id_dict, batch_copies, num_batches, device, decoding_order=None):
 
     # Form batch of clones
     batch_clones = [copy.deepcopy(protein) for _ in range(batch_copies)]
@@ -28,10 +45,14 @@ def predict_stability(model, protein, chain_id_dict, batch_copies, num_batches, 
     # Loop over number of batches
     scores = np.array([])
     for _ in range(num_batches):
+        
+        # Create decoding order
+        randn = torch.randn(chain_M.shape, device=device)
+        if decoding_order != None:
+            decoding_order = place_mutant_order(randn, protein['mut_idx'], last=decoding_order == 'mutant_last')
 
         # Run model
-        randn = torch.randn(chain_M.shape, device=device)
-        log_probs = model(X, S, mask, chain_M * chain_M_pos, residue_idx, chain_encoding_all, randn)
+        log_probs = model(X, S, mask, chain_M * chain_M_pos, residue_idx, chain_encoding_all, randn, use_input_decoding_order=decoding_order != None, decoding_order=decoding_order)
         
         # Compute score
         mask_for_loss = mask * chain_M * chain_M_pos
@@ -87,11 +108,13 @@ def stability_prediction(args):
         test_set = [mut.split(',')[:2] for mut in test_set_list[1:]]
         test_set_seqs = [mut[1] for mut in test_set]
         
-        # Insert gaps where a deletion is
+        # Insert gaps where a deletion is and record mutant location
+        test_set_mut_idx = []
         for i, seq in enumerate(test_set_seqs):
             if len(seq) < len(wt_seq):
                 k = next((idx for idx, res in enumerate(seq) if res != wt_seq[idx]), None)
                 test_set_seqs[i] = seq[:k] + '-' + seq[k:]
+            test_set_mut_idx.append(next((idx for idx, res in enumerate(seq) if res != wt_seq[idx]), None))
     else:
         test_set_seqs = []
 
@@ -122,25 +145,30 @@ def stability_prediction(args):
 
             # Write native outputs
             out_path = base_folder + f"{protein['name']}_stability.csv"
+            if args.decoding_order == 'mutant_first':
+                out_path = base_folder + f"{protein['name']}_stability_first.csv"
+            elif args.decoding_order == 'mutant_last':
+                out_path = base_folder + f"{protein['name']}_stability_last.csv"
             with open(out_path, 'w') as csv_file:
-                csv_file.write('ID,SEQ,SCORE.MEAN,SCORE.STD,DELTA.MEAN,RANKING,+/-\n')
-                csv_file.write(f"native,{protein['seq']},{native_score:.5f},{native_std:.5f},0,NA,NA\n")
+                csv_file.write('ID,SEQ,SCORE.MEAN,SCORE.STD,DELTA.MEAN,STABILITY.MEAN,RANKING,+/-\n')
+                csv_file.write(f"native,{protein['seq']},{native_score:.5f},{native_std:.5f},0,NA,NA,NA\n")
 
             out_list = []
-            for i in range(len(test_set_seqs)):
+            for i in range(len(test_set_seqs[:2])):
 
                 # Update the sequence with the mutated sequence
                 protein['seq_chain_A'] = test_set_seqs[i]
                 protein['seq'] = test_set_seqs[i]
+                protein['mut_idx'] = test_set_mut_idx[i]
 
                 # Score the mutant sequence
-                mutant_score, mutant_std = predict_stability(model, protein, chain_id_dict, BATCH_COPIES, NUM_BATCHES, device)
+                mutant_score, mutant_std = predict_stability(model, protein, chain_id_dict, BATCH_COPIES, NUM_BATCHES, device, args.decoding_order)
 
                 # Append to output list
                 out_list.append((test_set[i][0], test_set_seqs[i], mutant_score, mutant_std))
 
             # Reorder based on rank
-            ranked_out_list = sorted(out_list, key=lambda x: x[2] - native_score)
+            ranked_out_list = sorted(out_list, key=lambda x: x[2] - native_score, reverse=not args.descending_Tm)
 
             # Append to outfile
             with open(out_path, 'a') as csv_file:
@@ -148,7 +176,7 @@ def stability_prediction(args):
                 for i in range(len(file_out_list)):
                     ranking = i if args.sort_by_rank else ranked_out_list.index(out_list[i])
                     delta = file_out_list[i][2] - native_score
-                    csv_file.write(f"{file_out_list[i][0]},{file_out_list[i][1]},{file_out_list[i][2]:.5f},{file_out_list[i][3]},{delta:.5f},{ranking},{'+' if delta > 0.0 else '-'}\n")
+                    csv_file.write(f"{file_out_list[i][0]},{file_out_list[i][1]},{file_out_list[i][2]:.5f},{file_out_list[i][3]},{delta:.5f},{-1 * delta:.5f},{ranking},{'+' if delta < 0.0 else '-'}\n")
 
             # Print timing
             print(f'Finished prediction. Elapsed time = {time.time() - time_start:.3f}.')
@@ -162,10 +190,12 @@ if __name__ == '__main__':
     parser.add_argument("--model_name", type=str, default="v_48_020", help="ProteinMPNN model name: v_48_002, v_48_010, v_48_020, v_48_030; v_48_010=version with 48 edges 0.10A noise")
     parser.add_argument("--num_seq_per_target", type=int, default=1, help="Number of sequences to generate per target")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size; can set higher for titan, quadro GPUs, reduce this if running out of GPU memory")
+    parser.add_argument("--decoding_order", type=str, default=None, choices=['mutant_first', 'mutant_last'])
     parser.add_argument("--test_set_path", type=str, default='', help="Path csv containing mutant sequences to rank")
     parser.add_argument("--out_folder", type=str, default='.', help="Path to a folder to output sequences, e.g. /home/out/")
     
     parser.add_argument("--pdb_path", type=str, help="Path to a single PDB to be designed")
+    parser.add_argument("--descending_Tm", action='store_true')
     parser.add_argument('--sort_by_rank', action='store_true')
 
     # Get arguments
