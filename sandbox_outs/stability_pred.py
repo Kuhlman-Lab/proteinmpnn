@@ -176,11 +176,7 @@ def stability_prediction(args):
                 for i in range(len(file_out_list)):
                     ranking = i if args.sort_by_rank else ranked_out_list.index(out_list[i])
                     delta = file_out_list[i][2] - native_score
-<<<<<<< HEAD
                     csv_file.write(f"{file_out_list[i][0]},{file_out_list[i][1]},{file_out_list[i][2]:.5f},{file_out_list[i][3]},{delta:.5f},{-1 * delta:.5f},{ranking},{'+' if delta < 0.0 else '-'}\n")
-=======
-                    csv_file.write(f"{file_out_list[i][0]},{file_out_list[i][1]},{file_out_list[i][2]:.5f},{file_out_list[i][3]},{delta:.5f},{ranking},{'+' if delta < 0.0 else '-'}\n")
->>>>>>> temp
 
             # Print timing
             print(f'Finished prediction. Elapsed time = {time.time() - time_start:.3f}.')
