@@ -10,7 +10,7 @@ def determine_weight_directory() -> str:
     longleaf = 'longleaf' in os.path.expanduser('~')
 
     if longleaf:
-        weight_path = '/proj/kuhl_lab/alphafold/alphafold/data/'
+        weight_path = '/proj/kuhl_lab/proteinmpnn/run/model_weights/'
     else:
         weight_path = '/home/nzrandolph/git/ProteinMPNN/run/model_weights/'
 
@@ -144,11 +144,11 @@ def stability_prediction(args):
             native_score, native_std = predict_stability(model, protein, chain_id_dict, BATCH_COPIES, NUM_BATCHES, device)
 
             # Write native outputs
-            out_path = base_folder + f"{protein['name']}_stability.csv"
+            out_path = base_folder + f"{protein['name']}_stability_n{args.num_seq_per_target}.csv"
             if args.decoding_order == 'mutant_first':
-                out_path = base_folder + f"{protein['name']}_stability_first.csv"
+                out_path = base_folder + f"{protein['name']}_stability_first_n{args.num_seq_per_target}.csv"
             elif args.decoding_order == 'mutant_last':
-                out_path = base_folder + f"{protein['name']}_stability_last.csv"
+                out_path = base_folder + f"{protein['name']}_stability_last_n{args.num_seq_per_target}.csv"
             with open(out_path, 'w') as csv_file:
                 csv_file.write('ID,SEQ,SCORE.MEAN,SCORE.STD,DELTA.MEAN,STABILITY.MEAN,RANKING,+/-\n')
                 csv_file.write(f"native,{protein['seq']},{native_score:.5f},{native_std:.5f},0,NA,NA,NA\n")
@@ -176,7 +176,11 @@ def stability_prediction(args):
                 for i in range(len(file_out_list)):
                     ranking = i if args.sort_by_rank else ranked_out_list.index(out_list[i])
                     delta = file_out_list[i][2] - native_score
+<<<<<<< HEAD
                     csv_file.write(f"{file_out_list[i][0]},{file_out_list[i][1]},{file_out_list[i][2]:.5f},{file_out_list[i][3]},{delta:.5f},{-1 * delta:.5f},{ranking},{'+' if delta < 0.0 else '-'}\n")
+=======
+                    csv_file.write(f"{file_out_list[i][0]},{file_out_list[i][1]},{file_out_list[i][2]:.5f},{file_out_list[i][3]},{delta:.5f},{ranking},{'+' if delta < 0.0 else '-'}\n")
+>>>>>>> temp
 
             # Print timing
             print(f'Finished prediction. Elapsed time = {time.time() - time_start:.3f}.')
