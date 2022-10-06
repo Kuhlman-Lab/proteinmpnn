@@ -69,8 +69,7 @@ class ProteinDesignInputFormatter(object):
             self.symmetric_res = []
 
     def _check_res_validity(self, res_item: str) -> Tuple[str, int]:
-        split_item = re.split('(\d+)', res_item)
-        split_item = [item for item in split_item if item]
+        split_item = [item for item in re.split('(\d+)', res_item) if item]
         
         if len(split_item) != 2:
             raise ValueError(f'Unable to parse residue: {res_item}.')
@@ -120,8 +119,7 @@ class ProteinDesignInputFormatter(object):
 
     def parse_designable_res(self, design_str: str) -> Sequence[str]:
     
-        design_str = design_str.strip().split(",")
-        design_str = [s for s in design_str if s]
+        design_str = [s for s in design_str.strip().split(",") if s]
 
         design_res = []
         for item in design_str:
@@ -136,8 +134,7 @@ class ProteinDesignInputFormatter(object):
 
     def parse_symmetric_res(self, symmetric_str: str) -> Sequence[str]:
 
-        symmetric_str = symmetric_str.strip().split(",")
-        symmetric_str = [s for s in symmetric_str if s]
+        symmetric_str = [s for s in symmetric_str.strip().split(",") if s]
         
         symmetric_res = []
         for item in symmetric_str:
@@ -163,7 +160,7 @@ class ProteinDesignInputFormatter(object):
             chain_seqs = {}
 
             for chain in chains:
-                chain_seqs[chain.id]=[]
+                chain_seqs[chain.id] = []
                 res_index_chain = 1
                 residues = list(chain.get_residues())
 
@@ -174,6 +171,31 @@ class ProteinDesignInputFormatter(object):
                     # Record pdbid. E.g. A10
                     pdbid = chain.id + str(num_id)
 
+                    # Add gapped residues to dictionary
+                    if residue != residues[0]:
+
+                        # Determine number of gapped residues
+                        n_gaps = 0
+                        while True:
+                            prev_res = chain.id + str(num_id - n_gaps - 1)
+                            if prev_res not in pdbids:
+                                n_gaps += 1
+                            else:
+                                break
+
+                        for i in range(n_gaps):
+                            # Determine pdb id of gap residue
+                            prev_res = chain.id + str(num_id - n_gaps + i)
+
+                            # Update residue id dict with (X, residue chain, chain_index)
+                            pdbids[prev_res] = (self.AA3_to_AA1['XXX'], chain.id, res_index_chain)
+
+                            # Update chain sequence with X
+                            chain_seqs[chain.id].append(self.AA3_to_AA1['XXX'])
+
+                            # Increment
+                            res_index_chain += 1
+
                     # Update dict with (residue name, residue chain, chain index)
                     pdbids[pdbid] = (self.AA3_to_AA1.get(residue.get_resname(), 'XXX'), chain.id, res_index_chain)
 
@@ -183,14 +205,13 @@ class ProteinDesignInputFormatter(object):
                     # Update the chain index
                     res_index_chain += 1
 
-            for chain in chains:
                 # Make the list of AA1s into a single string for the chain sequence
                 chain_seqs[chain.id] = "".join([x for x in chain_seqs[chain.id] if x is not None])
 
             mutable = []
             for resind in self.design_res:
                 res_id = resind[0] + str(resind[1])
-                if res_id in pdbids:
+                if pdbids[res_id][0] != 'X':
                     mutable.append({"chain": pdbids[res_id][1], "resid": pdbids[res_id][2], 
                                     "WTAA": pdbids[res_id][0], "MutTo": self.design_default})
 
@@ -203,7 +224,7 @@ class ProteinDesignInputFormatter(object):
                     sym_res = []
                     for pos in tied_pos:
                         res_id = pos[0] + str(pos[1])
-                        if res_id not in pdbids:
+                        if pdbids[res_id][0] == 'X':
                             skip_tie = True
                             break
                         else:
