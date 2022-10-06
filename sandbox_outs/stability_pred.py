@@ -22,14 +22,15 @@ def place_mutant_order(randn, mut_idx, last=False):
     # Create random order
     decoding_order = torch.argsort(torch.abs(randn))
 
-    # Determine which order to look for
-    order = randn.shape[-1] - 1 if last else 0
+    if mut_idx:
+        # Determine which order to look for
+        order = randn.shape[-1] - 1 if last else 0
 
-    # Update current order res to mutant's index
-    decoding_order[:, torch.argmax((decoding_order == order).int(), dim=-1)] = decoding_order[:, [mut_idx] * randn.shape[0]]
+        # Update current order res to mutant's index
+        decoding_order[:, torch.argmax((decoding_order == order).int(), dim=-1)] = decoding_order[:, [mut_idx] * randn.shape[0]]
 
-    # Update mutant to order res
-    decoding_order[:, [mut_idx] * randn.shape[0]] = order
+        # Update mutant to order res
+        decoding_order[:, [mut_idx] * randn.shape[0]] = order
 
     return decoding_order
 
@@ -115,6 +116,8 @@ def stability_prediction(args):
                 k = next((idx for idx, res in enumerate(seq) if res != wt_seq[idx]), None)
                 test_set_seqs[i] = seq[:k] + '-' + seq[k:]
             test_set_mut_idx.append(next((idx for idx, res in enumerate(seq) if res != wt_seq[idx]), None))
+        if args._debug:
+            test_set_seqs = test_set_seqs[:2]
     else:
         test_set_seqs = []
 
@@ -154,7 +157,7 @@ def stability_prediction(args):
                 csv_file.write(f"native,{protein['seq']},{native_score:.5f},{native_std:.5f},0,NA,NA,NA\n")
 
             out_list = []
-            for i in range(len(test_set_seqs[:2])):
+            for i in range(len(test_set_seqs)):
 
                 # Update the sequence with the mutated sequence
                 protein['seq_chain_A'] = test_set_seqs[i]
@@ -197,6 +200,8 @@ if __name__ == '__main__':
     parser.add_argument("--pdb_path", type=str, help="Path to a single PDB to be designed")
     parser.add_argument("--descending_Tm", action='store_true')
     parser.add_argument('--sort_by_rank', action='store_true')
+
+    parser.add_argument('--_debug', action='store_true')
 
     # Get arguments
     args = parser.parse_args()

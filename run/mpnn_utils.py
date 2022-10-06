@@ -1,3 +1,4 @@
+from itertools import chain
 import os, glob, re
 from typing import Dict
 import numpy as np
@@ -7,6 +8,11 @@ from helper_scripts import make_fixed_positions_dict, make_tied_positions_dict
 # Model config for storing hyperparameters
 MODEL_CONFIG = {'hidden_dim': 128,
                 'num_layers': 3}
+
+# Chain letter alphabet
+init_alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G','H', 'I', 'J','K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T','U', 'V','W','X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g','h', 'i', 'j','k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't','u', 'v','w','x', 'y', 'z']
+extra_alphabet = [str(item) for item in list(np.arange(300))]
+chain_alphabet = init_alphabet + extra_alphabet
 
 
 def determine_weight_directory() -> str:
@@ -177,6 +183,7 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     #     --position_list "1 2 3 4 5 6 7 8, 1 2 3 4 5 6 7 8"
     fixed_positions_dict = make_fixed_positions_dict.main(*fixed_positions_args(design_spec_dict, protein))
     #fixed_positions_dict = None
+
     # Loaded from tied_positions_json
     # Usage in Examples 5 and 6 (VAN + CA)
     # /helper_scripts/make_tied_positions_dict.py
@@ -192,9 +199,49 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     tied_positions_dict = make_tied_positions_dict.main(*tied_positions_args(design_spec_dict, protein))
 
     # Loaded from omit_AA_json
-    # There is no example of usage for this file. So I'm leaving it as
-    # None for now.
-    omit_AA_dict = None
+    # From looking at tied_featurize, structure of the dictionary should be something like
+    # omit_AA_dict[pdb_name] = {chain_letter: [(res_idx, omit_AAs), ...]}
+    omit_AA_dict = {protein['name']: {}}
+    for chain_letter in chain_alphabet:
+        chain_seq = protein.get('seq_chain_' + chain_letter)
+        if chain_seq != None:
+            omit_AA_dict[protein['name']][chain_letter] = []
+            for res in design_spec_dict['designable']:
+                if res['chain'] == chain_letter:
+                    # Determine which residues to omit
+                    if res['MutTo'] != 'all':
+                        if 'hydphob' in res['MutTo']:
+                            # Exclude hydrophilics
+                            omit_AAs = 'CDEHKNPQRSTX'
+                        elif 'hydphil' in res['MutTo']:
+                            # Exclude hydrophobics
+                            omit_AAs = 'ACFGILMPVWYX'
+                        elif 'all' in res['MutTo'] and '-' in res['MutTo'] and '+' not in res['MutTo']:
+                            # Make list exclude no residues
+                            omit_AAs = 'X'
+                        elif set(res['MutTo']).issubset(set('ACDEFGHIKLMNPQRSTVWYX')):
+                            # Omit everything but what is provided
+                            omit_AAs = 'ACDEFGHIKLMNPQRSTVWYX'
+                            for aa in list(res['MutTo']):
+                                if aa in omit_AAs:
+                                    omit_AAs = list(omit_AAs)
+                                    omit_AAs.remove(aa)
+                                    omit_AAs = ''.join(omit_AAs)
+                        
+                        if '-' in res['MutTo']:
+                            # Add to omit list
+                            to_omit = res['MutTo'].split('-')[-1].split('+')[0]
+                            omit_AAs += to_omit
+                        if '+' in res['MutTo']:
+                            # Remove from omit list
+                            to_not_omit = res['MutTo'].split('+')[-1].split('-')[0]
+                            for aa in to_not_omit:
+                                if aa in omit_AAs:
+                                    omit_AAs = list(omit_AAs)
+                                    omit_AAs.remove(aa)
+                                    omit_AAs = ''.join(omit_AAs)
+                        omit_AA_dict[protein['name']][chain_letter].append([res['resid'], omit_AAs])
+
     
     # Loaded from pssm_json
     # There is no example of usage for this file. So I'm leaving it as
