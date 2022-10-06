@@ -268,8 +268,8 @@ def tied_featurize(batch, device, chain_dict, fixed_position_dict=None, omit_AA_
                 if omit_AA_dict!=None:
                     for item in omit_AA_dict[b['name']][letter]:
                         idx_AA = np.array(item[0])-1
-                        AA_idx = np.array([np.argwhere(np.array(list(alphabet))== AA)[0][0] for AA in item[1]]).repeat(idx_AA.shape[0])
-                        idx_ = np.array([[a, b] for a in idx_AA for b in AA_idx])
+                        AA_idx = np.array([np.argwhere(np.array(list(alphabet))== AA)[0][0] for AA in item[1]])
+                        idx_ = np.array([[idx_AA, b] for b in AA_idx])
                         omit_AA_mask_temp[idx_[:,0], idx_[:,1]] = 1
                 omit_AA_mask_list.append(omit_AA_mask_temp)
                 pssm_coef = np.zeros(chain_length)

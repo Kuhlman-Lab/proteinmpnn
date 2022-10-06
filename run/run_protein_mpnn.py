@@ -45,7 +45,7 @@ def run_protein_mpnn(args):
     temperatures = [float(item) for item in args.sampling_temp.split()]
 
     # Default is 'X'
-    omit_AAs_list = 'X'
+    omit_AAs_list = args.global_omit_AAs
     alphabet = 'ACDEFGHIKLMNPQRSTVWYZ'
     omit_AAs_np = np.array([AA in omit_AAs_list for AA in alphabet]).astype(np.float32) # 1 if omitting, 0 if not
 
@@ -355,6 +355,7 @@ if __name__ == "__main__":
     parser.add_argument("--pdb_dir", type=str, default='', help="Path to a single PDB to be designed")
     parser.add_argument("--design_specs_json", type=str, help="Path to a folder with parsed pdb into jsonl")
     parser.add_argument("--af2_formatted_output", action='store_true', help="Whether or not to include another output file that is in AF2 format for direct structure prediction after design.")
+    parser.add_argument("--global_omit_AAs", type=str, default='X', help='AAs to globally omit from all designable positions (e.g. PC for no proline or cysteine). Note that it is generally advisable to include X in this list. Default is X.')
 
     args = parser.parse_args()    
     run_protein_mpnn(args) 
