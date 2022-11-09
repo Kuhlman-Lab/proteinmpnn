@@ -3,6 +3,7 @@ import re
 import sys, os
 import argparse
 import math
+import numpy as np
 from typing import Optional, Sequence, Tuple, Dict
 from Bio.PDB import PDBParser
 
@@ -35,8 +36,8 @@ class FileArgumentParser(argparse.ArgumentParser):
 
 
 class ProteinDesignInputFormatter(object):
-    def __init__(self, pdb_dir: str, designable_res: Optional[str] = None, default_design_setting: str = 'all', 
-                 symmetric_res: Optional[str] = None) -> None:
+    def __init__(self, pdb_dir: str, designable_res: str = '', default_design_setting: str = 'all', 
+                 symmetric_res: str = '', cluster_center: str = '', cluster_radius: float = 10.0) -> None:
         self.CHAIN_IDS = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
         self.AA3 = ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 
                     'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR', 'XXX']
@@ -57,11 +58,15 @@ class ProteinDesignInputFormatter(object):
                 self.parser = PDBParser(QUIET=True)
 
         self.design_default = default_design_setting
-
+        
         if designable_res:
             self.design_res = self.parse_designable_res(designable_res)
         else:
             self.design_res = []
+            
+        if cluster_center:
+            cluster_mut = self.parse_cluster_center(cluster_center, cluster_radius)
+            self.design_res += cluster_mut
 
         if symmetric_res:
             self.symmetric_res = self.parse_symmetric_res(symmetric_res)
@@ -116,6 +121,70 @@ class ProteinDesignInputFormatter(object):
                              f'size for forcing symmetry: {symmetric_item}')
 
         return symmetry_dict
+
+    def _get_cluster_neighbors(self, center: str, cluster_radius: float) -> Sequence[str]:
+        
+        # Chain and residue number for center
+        center_ch, center_res = center
+        
+        for pdb in self.pdb_list:
+            # Get pdb structure
+            pdb_id = pdb[:-4]
+            pdb_file = os.path.join(self.pdb_dir, pdb)
+            pdb_struct = self.parser.get_structure(id=pdb_id, file=pdb_file)
+            
+            # Get list of chains
+            chains = list(pdb_struct.get_chains())
+            # Determine cluster location
+            for chain in chains:
+                # Find correct chain
+                if chain.id == center_ch:
+                    for residue in chain.get_residues():
+                        # Find correct residue
+                        if residue.id[1] == center_res:
+                            for atom in residue.get_atoms():
+                                # Find the CA atom and get its coords
+                                if atom.get_name() == 'CA':
+                                    center_pos = atom.get_coord()
+                                    break
+                            break
+                    break
+
+            # Determine neighbors using cluster radius        
+            neighbors = []
+            for chain in chains:
+                for residue in chain.get_residues():
+                    # Residue chain and number
+                    res_ch, res_num = chain.id, residue.id[1]
+                    
+                    for atom in residue.get_atoms():
+                        # Find the CA atom and compute distance from center
+                        if atom.get_name() == 'CA':
+                            dist2center = np.sqrt(np.sum((atom.get_coord() - center_pos) ** 2) + 1e-12)
+                            # If distance is less than radius, then add to neighbor list
+                            if dist2center <= cluster_radius:
+                                neighbors.append( (res_ch, res_num) )
+                                
+        return neighbors
+    
+    def parse_cluster_center(self, cluster_center: str, cluster_radius: float) -> Sequence[str]:
+        
+        cluster_center = [s for s in cluster_center.strip().split(',') if s]
+        
+        centers = []
+        for item in cluster_center:
+            if "-" not in item:
+                item_ch, item_idx = self._check_res_validity(item)
+                centers.append( (item_ch, item_idx) )
+            else:
+                range_res = self._check_range_validity(item)
+                centers += range_res
+        
+        design_res = []    
+        for center in centers:
+            design_res += self._get_cluster_neighbors(center, cluster_radius)
+                
+        return design_res
 
     def parse_designable_res(self, design_str: str) -> Sequence[str]:
     
@@ -274,6 +343,17 @@ def get_arguments() -> argparse.Namespace:
                         "symmetry between residues 1-5 on chains A and B use "
                         "'A1-A5:B1-B15'. (Note that the number of residues on"
                         " each side of the colon must be the same).")
+    parser.add_argument('--cluster_center',
+                        default='',
+                        type=str,
+                        help="PDB chain and residue numbers which will serve as "
+                        "mutation centers. Every residue with a CA within "
+                        "--cluster_radius Angstroms will be mutatable")
+    parser.add_argument('--cluster_radius',
+                        default=10.0,
+                        type=float,
+                        help="Radius from cluster mutation centers in which to "
+                        "include residues for mutation. Default is 10.0 A.")
     parser.add_argument('--out_path',
                         default='proteinmpnn_res_specs.json',
                         type=str,
@@ -289,6 +369,6 @@ def get_arguments() -> argparse.Namespace:
 if __name__=="__main__":
     args = get_arguments()
 
-    pdif = ProteinDesignInputFormatter(args.pdb_dir, args.designable_res, args.default_design_setting, args.symmetric_res)
+    pdif = ProteinDesignInputFormatter(args.pdb_dir, args.designable_res, args.default_design_setting, 
+                                       args.symmetric_res, args.cluster_center, args.cluster_radius)
     pdif.generate_json(args.out_path)
-
