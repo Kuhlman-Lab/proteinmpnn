@@ -61,6 +61,7 @@ def get_pdb_dataset(pdb_dir: str) -> StructureDatasetPDB:
 
     return dataset_valid
 
+
 def get_pdb_dataset_func(pdb_list: list) -> StructureDatasetPDB:
     """ Takes list of pdb strings and returns a dataset containing coordinates
     of every parsed protein chain.
@@ -227,6 +228,9 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
                                     omit_AAs = list(omit_AAs)
                                     omit_AAs.remove(aa)
                                     omit_AAs = ''.join(omit_AAs)
+                        else:
+                            # Provide a default of X to omit_AAs
+                            omit_AAs = 'X'
                         
                         if '-' in res['MutTo']:
                             # Add to omit list
@@ -242,7 +246,6 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
                                     omit_AAs = ''.join(omit_AAs)
                         omit_AA_dict[protein['name']][chain_letter].append([res['resid'], omit_AAs])
 
-    
     # Loaded from pssm_json
     # There is no example of usage for this file. So I'm leaving it as
     # None for now.
