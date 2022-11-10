@@ -46,7 +46,7 @@ def run_protein_mpnn(args):
 
     # Default is 'X'
     omit_AAs_list = args.global_omit_AAs
-    alphabet = 'ACDEFGHIKLMNPQRSTVWYZ'
+    alphabet = 'ACDEFGHIKLMNPQRSTVWYX'
     omit_AAs_np = np.array([AA in omit_AAs_list for AA in alphabet]).astype(np.float32) # 1 if omitting, 0 if not
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -118,9 +118,9 @@ def run_protein_mpnn(args):
                         pssm_log_odds_flag = 0
                         pssm_bias_flag = 0
                         if tied_positions_dict == None:
-                            sample_dict = model.sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temerature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all)
+                            sample_dict = model.sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temerature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
                         else:
-                            sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), tied_pos=tied_pos_list_of_lists_list[0], tied_beta=tied_beta, bias_by_res=bias_by_res_all)
+                            sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), tied_pos=tied_pos_list_of_lists_list[0], tied_beta=tied_beta, bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
                         S_sample = sample_dict["S"]
                         log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
                         mask_for_loss = mask*chain_M*chain_M_pos
@@ -211,7 +211,7 @@ def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", bac
 
     # Default is 'X'
     omit_AAs_list = 'X'
-    alphabet = 'ACDEFGHIKLMNPQRSTVWYZ'
+    alphabet = 'ACDEFGHIKLMNPQRSTVWYX'
     omit_AAs_np = np.array([AA in omit_AAs_list for AA in alphabet]).astype(np.float32) # 1 if omitting, 0 if not
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -350,6 +350,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_seq_per_target", type=int, default=1, help="Number of sequences to generate per target")
     parser.add_argument("--batch_size", type=int, default=1, help="Batch size; can set higher for titan, quadro GPUs, reduce this if running out of GPU memory")
     parser.add_argument("--sampling_temp", type=str, default="0.1", help="A string of temperatures, 0.2 0.25 0.5. Sampling temperature for amino acids, T=0.0 means taking argmax, T>>1.0 means sample randomly. Suggested values 0.1, 0.15, 0.2, 0.25, 0.3. Higher values will lead to more diversity.")
+    parser.add_argument("--destabilize", action="store_true", help="Include to invert aa probabilities by making less favored amino acids more common.")
     
     parser.add_argument("--out_folder", type=str, help="Path to a folder to output sequences, e.g. /home/out/")
     parser.add_argument("--pdb_dir", type=str, default='', help="Path to a single PDB to be designed")

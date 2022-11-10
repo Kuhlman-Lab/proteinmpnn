@@ -1,4 +1,3 @@
-from __future__ import print_function
 import json, time, os
 import numpy as np
 import torch
@@ -864,7 +863,7 @@ class ProteinMPNN(nn.Module):
 
 
 
-    def sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, bias_by_res=None):
+    def sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, bias_by_res=None, invert_probs=False):
         device = X.device
         # Prepare node and edge embeddings
         E, E_idx = self.features(X, mask, residue_idx, chain_encoding_all)
@@ -935,6 +934,10 @@ class ProteinMPNN(nn.Module):
                     probs_masked = probs*pssm_log_odds_mask_gathered
                     probs_masked += probs * 0.001
                     probs = probs_masked/torch.sum(probs_masked, dim=-1, keepdim=True) #[B, 21]
+                if invert_probs:
+                    print(constant.shape)
+                    probs = (1. / (probs + 1e-12)) * (1. - constant[None, :])
+                    probs = probs / torch.sum(probs)
                 if omit_AA_mask_flag:
                     omit_AA_mask_gathered = torch.gather(omit_AA_mask, 1, t[:,None, None].repeat(1,1,omit_AA_mask.shape[-1]))[:,0] #[B, 21]
                     probs_masked = probs*(1.0-omit_AA_mask_gathered)
@@ -950,7 +953,7 @@ class ProteinMPNN(nn.Module):
         return output_dict
 
 
-    def tied_sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, tied_pos=None, tied_beta=None, bias_by_res=None):
+    def tied_sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, tied_pos=None, tied_beta=None, bias_by_res=None, invert_probs=False):
         device = X.device
         # Prepare node and edge embeddings
         E, E_idx = self.features(X, mask, residue_idx, chain_encoding_all)
@@ -1037,6 +1040,9 @@ class ProteinMPNN(nn.Module):
                     probs_masked = probs*pssm_log_odds_mask_gathered
                     probs_masked += probs * 0.001
                     probs = probs_masked/torch.sum(probs_masked, dim=-1, keepdim=True) #[B, 21]
+                if invert_probs:
+                    probs = (1. / (probs + 1e-12)) * (1. - constant[None, :])
+                    probs = probs / torch.sum(probs)
                 if omit_AA_mask_flag:
                     omit_AA_mask_gathered = omit_AA_mask[:,t]
                     probs_masked = probs*(1.0-omit_AA_mask_gathered)

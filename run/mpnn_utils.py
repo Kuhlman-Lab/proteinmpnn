@@ -183,6 +183,8 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     #     --chain_list "A C"
     #     --position_list "1 2 3 4 5 6 7 8, 1 2 3 4 5 6 7 8"
     fixed_positions_dict = make_fixed_positions_dict.main(*fixed_positions_args(design_spec_dict, protein))
+    if fixed_positions_dict == {}:
+        fixed_positions_dict = None
     #fixed_positions_dict = None
 
     # Loaded from tied_positions_json
@@ -198,6 +200,8 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     #     --chain_list "A C"
     #     --position_list "1 2 3 4 5 6 7 8, 1 2 3 4 5 6 7 8" 
     tied_positions_dict = make_tied_positions_dict.main(*tied_positions_args(design_spec_dict, protein))
+    if tied_positions_dict == {}:
+        tied_positions_dict = None
 
     # Loaded from omit_AA_json
     # From looking at tied_featurize, structure of the dictionary should be something like
