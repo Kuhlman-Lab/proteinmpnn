@@ -1,2 +1,3 @@
 --pdb_dir ./
 --designable_res A43-A185,B43-B185
+--default_design_setting all-C
