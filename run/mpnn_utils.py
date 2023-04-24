@@ -151,7 +151,100 @@ def tied_positions_args(design_spec_dict, protein):
     return [protein], 0, ', '.join(position_list), ' '.join(list(chain_positions.keys()))
 
 
-def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein):
+def _form_omit_AA_list(res):
+    alphabet = set('ACDEFGHIKLMNPQRSTVWY')
+    hydphob = {'omit': set('CDEHKNPQRSTX'), 'include': alphabet.difference('CDEHKNPQRSTX')}
+    hydphil = {'omit': set('ACFGILMPVWYX'), 'include': alphabet.difference('ACFGILMPVWYX')}
+    polar = {'omit': set('AGILMFPWVX'), 'include': alphabet.difference('AGILMFPWVX')}
+    nonpolar = {'omit': set('RNDCQEHKSTYX'), 'include': alphabet.difference('RNDCQEHKSTYX')}
+
+    mutate_keys = ['+' + key for key in res['MutTo'].split('+')]
+    mutate_keys = [[('-' if item[0] != '+' else '') + item for item in key.split('-')] for key in mutate_keys]
+    mutate_keys = [elem for item in mutate_keys for elem in item]
+
+    omit_AAs = set('X')
+    for key in mutate_keys:
+        if key[0] == '+':
+            if key[1:] == 'hydphob':
+                omit_AAs = omit_AAs.union(hydphob['omit'])
+            elif key[1:] == 'hydphil':
+                omit_AAs = omit_AAs.union(hydphil['omit'])
+            elif key[1:] == 'polar':
+                omit_AAs = omit_AAs.union(polar['omit'])
+            elif key[1:] == 'nonpolar':
+                omit_AAs = omit_AAs.union(nonpolar['omit'])
+            elif key[1:] == 'all':
+                omit_AAs = omit_AAs.difference(alphabet)
+            elif key[1:] == 'native':
+                omit_AAs = omit_AAs.difference(set(res['WTAA']))
+            elif set(key[1:]).issubset(alphabet):
+                omit_AAs = omit_AAs.difference(set(key[1:]))
+        elif key[0] == '-':
+            if key[1:] == 'hydphob':
+                omit_AAs = omit_AAs.difference(hydphob['include'])
+            elif key[1:] == 'hydphil':
+                omit_AAs = omit_AAs.difference(hydphil['include'])
+            elif key[1:] == 'polar':
+                omit_AAs = omit_AAs.difference(polar['include'])
+            elif key[1:] == 'nonpolar':
+                omit_AAs = omit_AAs.difference(nonpolar['include'])
+            elif key[1:] == 'all':
+                omit_AAs = omit_AAs.union(alphabet)
+            elif key[1:] == 'native':
+                omit_AAs = omit_AAs.union(set(res['WTAA']))
+            elif set(key[1:]).issubset(alphabet):
+                omit_AAs = omit_AAs.union(set(key[1:]))
+                
+    return ''.join(list(omit_AAs))
+
+
+def _old_form_omit_AA_list(res):
+    # Determine which residues to omit
+    if res['MutTo'] != 'all':                        
+        if 'hydphob' in res['MutTo']:
+            # Exclude hydrophilics
+            omit_AAs = 'CDEHKNPQRSTX'
+        elif 'hydphil' in res['MutTo']:
+            # Exclude hydrophobics
+            omit_AAs = 'ACFGILMPVWYX'
+        elif 'polar' in res['MutTo']:
+            # Exclude nonpolars
+            omit_AAs = 'AGILMFPWV'
+        elif 'nonpolar' in res['MutTo']:
+            # Exclude polars
+            omit_AAs = 'RNDCQEHKSTY'
+        elif 'all' in res['MutTo'] and '-' in res['MutTo'] and '+' not in res['MutTo']:
+            # Make list exclude no residues
+            omit_AAs = 'X'
+        elif set(res['MutTo']).issubset(set('ACDEFGHIKLMNPQRSTVWYX')):
+            # Omit everything but what is provided
+            omit_AAs = 'ACDEFGHIKLMNPQRSTVWYX'
+            for aa in list(res['MutTo']):
+                if aa in omit_AAs:
+                    omit_AAs = list(omit_AAs)
+                    omit_AAs.remove(aa)
+                    omit_AAs = ''.join(omit_AAs)
+        else:
+            # Provide a default of X to omit_AAs
+            omit_AAs = 'X'
+        
+        if '-' in res['MutTo']:
+            # Add to omit list
+            to_omit = res['MutTo'].split('-')[-1].split('+')[0]
+            omit_AAs += to_omit
+        if '+' in res['MutTo']:
+            # Remove from omit list
+            to_not_omit = res['MutTo'].split('+')[-1].split('-')[0]
+            for aa in to_not_omit:
+                if aa in omit_AAs:
+                    omit_AAs = list(omit_AAs)
+                    omit_AAs.remove(aa)
+                    omit_AAs = ''.join(omit_AAs)
+                
+    return omit_AAs
+
+
+def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein, experimental=False):
     
     # Loaded from chain_id_json
     # Additional example of design at line 144
@@ -214,42 +307,13 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
             for res in design_spec_dict['designable']:
                 if res['chain'] == chain_letter:
                     # Determine which residues to omit
-                    if res['MutTo'] != 'all':
-                        if 'hydphob' in res['MutTo']:
-                            # Exclude hydrophilics
-                            omit_AAs = 'CDEHKNPQRSTX'
-                        elif 'hydphil' in res['MutTo']:
-                            # Exclude hydrophobics
-                            omit_AAs = 'ACFGILMPVWYX'
-                        elif 'all' in res['MutTo'] and '-' in res['MutTo'] and '+' not in res['MutTo']:
-                            # Make list exclude no residues
-                            omit_AAs = 'X'
-                        elif set(res['MutTo']).issubset(set('ACDEFGHIKLMNPQRSTVWYX')):
-                            # Omit everything but what is provided
-                            omit_AAs = 'ACDEFGHIKLMNPQRSTVWYX'
-                            for aa in list(res['MutTo']):
-                                if aa in omit_AAs:
-                                    omit_AAs = list(omit_AAs)
-                                    omit_AAs.remove(aa)
-                                    omit_AAs = ''.join(omit_AAs)
+                    if res['MutTo'] != 'all':                        
+                        if experimental:
+                            omit_AAs = _form_omit_AA_list(res)
                         else:
-                            # Provide a default of X to omit_AAs
-                            omit_AAs = 'X'
-                        
-                        if '-' in res['MutTo']:
-                            # Add to omit list
-                            to_omit = res['MutTo'].split('-')[-1].split('+')[0]
-                            omit_AAs += to_omit
-                        if '+' in res['MutTo']:
-                            # Remove from omit list
-                            to_not_omit = res['MutTo'].split('+')[-1].split('-')[0]
-                            for aa in to_not_omit:
-                                if aa in omit_AAs:
-                                    omit_AAs = list(omit_AAs)
-                                    omit_AAs.remove(aa)
-                                    omit_AAs = ''.join(omit_AAs)
+                            omit_AAs = _old_form_omit_AA_list(res)
                         omit_AA_dict[protein['name']][chain_letter].append([res['resid'], omit_AAs])
-
+    #print(omit_AAs)
     # Loaded from pssm_json
     # There is no example of usage for this file. So I'm leaving it as
     # None for now.
