@@ -89,7 +89,7 @@ def run_protein_mpnn(args):
             all_log_probs_list = []
             S_sample_list = []
             batch_clones = [copy.deepcopy(protein) for i in range(BATCH_COPIES)]
-            chain_id_dict, fixed_positions_dict, pssm_dict, omit_AA_dict, bias_AA_dict, tied_positions_dict, bias_by_res_dict = transform_inputs(design_specs_dict, protein)
+            chain_id_dict, fixed_positions_dict, pssm_dict, omit_AA_dict, bias_AA_dict, tied_positions_dict, bias_by_res_dict = transform_inputs(design_specs_dict, protein, experimental=args.experimental)
             X, S, mask, _, chain_M, chain_encoding_all, _, visible_list_list, masked_list_list, masked_chain_length_list_list, chain_M_pos, omit_AA_mask, residue_idx, _, tied_pos_list_of_lists_list, pssm_coef, pssm_bias, pssm_log_odds_all, bias_by_res_all, tied_beta = tied_featurize(batch_clones, device, chain_id_dict, fixed_positions_dict, omit_AA_dict, tied_positions_dict, pssm_dict, bias_by_res_dict)
             
             # Setting pssm threshold to 0 for now. TODO: CHANGE LATER
@@ -189,6 +189,7 @@ def run_protein_mpnn(args):
             num_seqs = len(temperatures)*NUM_BATCHES*BATCH_COPIES
             total_length = X.shape[1]
             print(f'{num_seqs} sequences of length {total_length} generated in {dt} seconds')
+
 
 def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", backbone_noise=0.00, num_seq_per_target=1, batch_size=1, sampling_temp="0.1", af2_formatted_output=False):
     # Extract hyperparameters from model config
@@ -340,6 +341,7 @@ def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", bac
 
     return outputs
 
+
 if __name__ == "__main__":
     # Construct the parser and its arguments.
     parser = FileArgumentParser(description='Script that runs ProteinMPNN.', 
@@ -357,6 +359,7 @@ if __name__ == "__main__":
     parser.add_argument("--design_specs_json", type=str, help="Path to a folder with parsed pdb into jsonl")
     parser.add_argument("--af2_formatted_output", action='store_true', help="Whether or not to include another output file that is in AF2 format for direct structure prediction after design.")
     parser.add_argument("--global_omit_AAs", type=str, default='X', help='AAs to globally omit from all designable positions (e.g. PC for no proline or cysteine). Note that it is generally advisable to include X in this list. Default is X.')
+    parser.add_argument('--experimental', action='store_true', help='Enables experimental parsing of allowable mutations')
 
     args = parser.parse_args()    
     run_protein_mpnn(args) 
