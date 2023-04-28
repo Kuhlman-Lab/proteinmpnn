@@ -91,7 +91,6 @@ def run_protein_mpnn(args):
             batch_clones = [copy.deepcopy(protein) for i in range(BATCH_COPIES)]
             chain_id_dict, fixed_positions_dict, pssm_dict, omit_AA_dict, bias_AA_dict, tied_positions_dict, bias_by_res_dict = transform_inputs(design_specs_dict, protein, experimental=args.experimental)
             X, S, mask, _, chain_M, chain_encoding_all, _, visible_list_list, masked_list_list, masked_chain_length_list_list, chain_M_pos, omit_AA_mask, residue_idx, _, tied_pos_list_of_lists_list, pssm_coef, pssm_bias, pssm_log_odds_all, bias_by_res_all, tied_beta = tied_featurize(batch_clones, device, chain_id_dict, fixed_positions_dict, omit_AA_dict, tied_positions_dict, pssm_dict, bias_by_res_dict)
-            
             # Setting pssm threshold to 0 for now. TODO: CHANGE LATER
             pssm_threshold = 0.0
             pssm_log_odds_mask = (pssm_log_odds_all > pssm_threshold).float()
@@ -101,12 +100,17 @@ def run_protein_mpnn(args):
             randn_1 = torch.randn(chain_M.shape, device=X.device)
             log_probs = model(X, S, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_1)
             mask_for_loss = mask*chain_M*chain_M_pos
-            scores = _scores(S, log_probs, mask_for_loss)
-            native_score = scores.cpu().data.numpy()
-
+            scores, scores_per_res = _scores(S, log_probs, mask_for_loss)
+            native_score, native_scores_per_res = scores.cpu().data.numpy(), scores_per_res
+            native_mask_for_loss = mask_for_loss
             # Generate some sequences
             ali_file = os.path.join(output_folder,  batch_clones[0]['name'] + '.fasta')
             af2_file = os.path.join(output_folder, batch_clones[0]['name'] + '.csv')
+            # multi-state splitting files
+            if 'chain_key' in design_specs_dict:
+                split_ali = [os.path.join(output_folder, fi + '.fasta') for fi in design_specs_dict['chain_key'].keys()]
+                split_af2 = [os.path.join(output_folder, fi + '.csv') for fi in design_specs_dict['chain_key'].keys()]
+            
             print(f'Generating sequences for: {name_}')
             t0 = time.time()
             with open(ali_file, 'w') as f:
@@ -124,7 +128,7 @@ def run_protein_mpnn(args):
                         S_sample = sample_dict["S"]
                         log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
                         mask_for_loss = mask*chain_M*chain_M_pos
-                        scores = _scores(S_sample, log_probs, mask_for_loss)
+                        scores, scores_per_res = _scores(S_sample, log_probs, mask_for_loss)
                         scores = scores.cpu().data.numpy()
                         all_probs_list.append(sample_dict["probs"].cpu().data.numpy())
                         all_log_probs_list.append(log_probs.cpu().data.numpy())
@@ -132,7 +136,8 @@ def run_protein_mpnn(args):
                         for b_ix in range(BATCH_COPIES):
                             masked_chain_length_list = masked_chain_length_list_list[b_ix]
                             masked_list = masked_list_list[b_ix]
-                            seq_recovery_rate = torch.sum(torch.sum(torch.nn.functional.one_hot(S[b_ix], 21)*torch.nn.functional.one_hot(S_sample[b_ix], 21), axis=-1)*mask_for_loss[b_ix])/torch.sum(mask_for_loss[b_ix])
+                            seq_recovery_per_res = torch.sum(torch.nn.functional.one_hot(S[b_ix], 21)*torch.nn.functional.one_hot(S_sample[b_ix], 21), axis=-1)*mask_for_loss[b_ix]
+                            seq_recovery_rate = torch.sum(seq_recovery_per_res)/torch.sum(mask_for_loss[b_ix])
                             seq = _S_to_seq(S_sample[b_ix], chain_M[b_ix])
                             score = scores[b_ix]
                             score_list.append(score)
@@ -157,6 +162,35 @@ def run_protein_mpnn(args):
                                 print_visible_chains = [visible_list_list[0][i] for i in sorted_visible_chain_letters]
                                 native_score_print = np.format_float_positional(np.float32(native_score.mean()), unique=False, precision=4)
                                 f.write('>{}, score={}, fixed_chains={}, designed_chains={}, model_name={}\n{}\n'.format(name_, native_score_print, print_visible_chains, print_masked_chains, args.model_name, native_seq)) #write the native sequence
+
+                                # FOR NATIVE SEQUENCES
+                                # Calculating per-chain scores and splitting states into separate .fasta files
+                                if 'chain_key' in design_specs_dict:
+                                    for fsplit, af2split in zip(split_ali, split_af2):
+                                        with open(fsplit, 'w') as fsp:
+                                            fbase = os.path.splitext(os.path.basename(fsplit))[0]
+                                            chains_original = list(design_specs_dict['chain_key'][fbase].keys())
+                                            chains_to_recover = list(design_specs_dict['chain_key'][fbase].values())
+                                            chain_idx = [masked_list_list[0].index(ctr) for ctr in chains_to_recover]
+                                            native_seq_split = '/'.join([native_seq.split('/')[idx] for idx in chain_idx])
+                                            scores_per_chain = {}
+
+                                            for ctr, idx in zip(chains_original, chain_idx):
+                                                # grab the indices for scoring each chain
+                                                score_idx = chain_encoding_all == idx + 1
+                                                chain_score = torch.sum(native_scores_per_res[score_idx], dim=-1) / torch.sum(native_mask_for_loss[score_idx], dim=-1)
+                                                chain_score = np.format_float_positional(np.float32(chain_score.cpu().data.numpy().mean()), unique=False, precision=4)
+                                                scores_per_chain[ctr] = chain_score
+
+                                            fsp.write('>{}, fixed_chains={}, designed_chains={}, scores_per_chain={}, model={}\n{}\n'.format(fbase, print_visible_chains, chains_original, 
+                                                                                                                                            scores_per_chain, args.model_name, native_seq_split))
+                    
+                                            if args.af2_formatted_output:
+                                                with open(af2split, 'w') as faf2:
+                                                    af2_seqs = native_seq_split.split('/')
+                                                    af2_seqs = ',' + ','.join(af2_seqs)
+                                                    faf2.write(f'{af2_seqs} # {name_}, fixed_chains={print_visible_chains}, designed_chains={chains_original}, scores_per_chain={scores_per_chain}, model_name={args.model_name}\n')    
+
                                 if args.af2_formatted_output:
                                     with open(af2_file, 'w') as af2:
                                         af2_seqs = native_seq.split('/')
@@ -179,6 +213,38 @@ def run_protein_mpnn(args):
                             score_print = np.format_float_positional(np.float32(score), unique=False, precision=4)
                             seq_rec_print = np.format_float_positional(np.float32(seq_recovery_rate.detach().cpu().numpy()), unique=False, precision=4)
                             f.write('>T={}, sample={}, score={}, seq_recovery={}\n{}\n'.format(temp,b_ix,score_print,seq_rec_print,seq)) #write generated sequence
+
+                            # FOR DESIGNED SEQUENCES
+                            if 'chain_key' in design_specs_dict:
+                                # split generated seq and save each to separate file
+                                for fsplit, af2split in zip(split_ali, split_af2):
+                                    with open(fsplit, 'a') as fsp:
+                                        fbase = os.path.splitext(os.path.basename(fsplit))[0]
+                                        chains_original = list(design_specs_dict['chain_key'][fbase].keys())
+                                        chains_to_recover = list(design_specs_dict['chain_key'][fbase].values())
+                                        chain_idx = [masked_list.index(ctr) for ctr in chains_to_recover]
+                                        seq_split = '/'.join([seq.split('/')[idx] for idx in chain_idx])
+
+                                        scores_per_chain, seq_recovery_per_chain = {}, {}
+                                        for ctr, idx in zip(chains_original, chain_idx):
+                                                # grab the indices for scoring each chain
+                                                score_idx = chain_encoding_all == idx + 1
+                                                chain_score = torch.sum(scores_per_res[score_idx], dim=-1) / torch.sum(mask_for_loss[score_idx], dim=-1)
+                                                chain_score = np.format_float_positional(np.float32(chain_score.cpu().data.numpy().mean()), unique=False, precision=4)
+                                                scores_per_chain[ctr] = chain_score
+                                                # use this for seq recovery too
+                                                chain_seq_rec = torch.sum(seq_recovery_per_res.unsqueeze(0)[score_idx], dim=-1) / torch.sum(mask_for_loss[score_idx], dim=-1)
+                                                seq_recovery_per_chain[ctr] = np.format_float_positional(np.float32(chain_seq_rec.cpu().data.numpy().mean()), unique=False, precision=4)
+
+                                        fsp.write('>{}, sample={}, scores_per_chain={}, seq_recovery_per_chain={}, model={}\n{}\n'.format(fbase, b_ix, scores_per_chain,  seq_recovery_per_chain, args.model_name, seq_split))
+
+                                    if args.af2_formatted_output:
+                                        with open(af2split, 'a') as faf2:
+                                            af2_seqs = seq_split.split('/')
+                                            af2_seqs = ',' + ','.join(af2_seqs)
+                                            faf2.write(f'{af2_seqs} # T={temp}, sample={b_ix}, scores_per_chain={scores_per_chain}, seq_recovery_per_chain={seq_recovery_per_chain}\n')
+
+
                             if args.af2_formatted_output:
                                 with open(af2_file, 'a') as af2:
                                     af2_seqs = seq.split('/')
@@ -260,7 +326,7 @@ def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", bac
             randn_1 = torch.randn(chain_M.shape, device=X.device)
             log_probs = model(X, S, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_1)
             mask_for_loss = mask*chain_M*chain_M_pos
-            scores = _scores(S, log_probs, mask_for_loss)
+            scores, _ = _scores(S, log_probs, mask_for_loss)
             native_score = scores.cpu().data.numpy()
 
             # Generate some sequences
@@ -280,7 +346,7 @@ def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", bac
                     S_sample = sample_dict["S"]
                     log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
                     mask_for_loss = mask*chain_M*chain_M_pos
-                    scores = _scores(S_sample, log_probs, mask_for_loss)
+                    scores, _ = _scores(S_sample, log_probs, mask_for_loss)
                     scores = scores.cpu().data.numpy()
                     all_probs_list.append(sample_dict["probs"].cpu().data.numpy())
                     all_log_probs_list.append(log_probs.cpu().data.numpy())

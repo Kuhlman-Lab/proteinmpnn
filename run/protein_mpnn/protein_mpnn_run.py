@@ -211,7 +211,7 @@ def main(args):
                     randn_1 = torch.randn(chain_M.shape, device=X.device)
                     log_probs = model(X, S, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_1)
                     mask_for_loss = mask*chain_M*chain_M_pos
-                    scores = _scores(S, log_probs, mask_for_loss)
+                    scores, _ = _scores(S, log_probs, mask_for_loss)
                     native_score = scores.cpu().data.numpy()
                     native_score_list.append(native_score)
                 native_score = np.concatenate(native_score_list, 0)
@@ -247,7 +247,7 @@ def main(args):
                 randn_1 = torch.randn(chain_M.shape, device=X.device)
                 log_probs = model(X, S, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_1)
                 mask_for_loss = mask*chain_M*chain_M_pos
-                scores = _scores(S, log_probs, mask_for_loss)
+                scores, _ = _scores(S, log_probs, mask_for_loss)
                 native_score = scores.cpu().data.numpy()
                 # Generate some sequences
                 ali_file = base_folder + '/seqs/' + batch_clones[0]['name'] + '.fa'
@@ -268,7 +268,7 @@ def main(args):
                                 S_sample = sample_dict["S"]
                             log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
                             mask_for_loss = mask*chain_M*chain_M_pos
-                            scores = _scores(S_sample, log_probs, mask_for_loss)
+                            scores, _ = _scores(S_sample, log_probs, mask_for_loss)
                             scores = scores.cpu().data.numpy()
                             all_probs_list.append(sample_dict["probs"].cpu().data.numpy())
                             all_log_probs_list.append(log_probs.cpu().data.numpy())
