@@ -103,8 +103,7 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
     def combine_pdbs(self, gap):
         """ Combines list of PDBs into one shared PDB file as needed by MPNN (separated by 1000A each). """
         initial_pdb = self.pdb_list[0]
-        parser = PDBParser(QUIET=True)
-        target = parser.get_structure('main', initial_pdb)
+        target = self.parser.get_structure('main', initial_pdb)
 
         init_ch = [c.id for c in target.get_chains()]
         init_dict = {}
@@ -120,7 +119,7 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
         
         for model in target:
             for inc, pdb in enumerate(self.pdb_list[1:]):
-                mobile = parser.get_structure('mobile', pdb)
+                mobile = self.parser.get_structure('mobile', pdb)
                 mobile_dict = {}
                 for m in mobile:
                     for chain in m:
