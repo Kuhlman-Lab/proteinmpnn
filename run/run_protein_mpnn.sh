@@ -14,7 +14,7 @@
 source ~/.bashrc
 conda activate mpnn
 
-# python ../../../run/prep_multi_state.py @multi_state.flags
+# python ../../../run/generate_json_multi_state.py @json_multi_state.flags
 python ../../../run/generate_json.py @json.flags
 
 python ../../../run/run_protein_mpnn.py @proteinmpnn.flags
