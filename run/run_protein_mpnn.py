@@ -30,7 +30,7 @@ def run_protein_mpnn(args):
     ckpt_path = os.path.join(model_weight_dir, f'{args.model_name}.pt')
     if not os.path.isfile(ckpt_path):
         raise ValueError('Invalid model name provided. Choose ca_48_002, ca_48_020, v_48_002, '
-                         'v_48_010, v_48_020, or v_48_030.')
+                         'v_48_010, v_48_020, v_48_030, s_48_010, or s_48_020.')
 
     # Get and set up output directory
     output_folder = args.out_folder
@@ -282,7 +282,7 @@ def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", bac
     ckpt_path = os.path.join(model_weight_dir, f'{model_name}.pt')
     if not os.path.isfile(ckpt_path):
         raise ValueError('Invalid model name provided. Choose ca_48_002, ca_48_020, v_48_002, '
-                         'v_48_010, v_48_020, or v_48_030.')
+                         'v_48_010, v_48_020, v_48_030, s_48_010, or s_48_020.')
 
     # NOT SURE WHAT THESE DO
     NUM_BATCHES = num_seq_per_target // batch_size
