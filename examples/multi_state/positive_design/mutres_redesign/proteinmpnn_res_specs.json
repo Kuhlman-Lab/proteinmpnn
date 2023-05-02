@@ -7,12 +7,6 @@
   "designable": [
     {
       "chain": "A",
-      "resid": 1,
-      "WTAA": "S",
-      "MutTo": "all"
-    },
-    {
-      "chain": "A",
       "resid": 2,
       "WTAA": "L",
       "MutTo": "all"
@@ -73,12 +67,6 @@
     },
     {
       "chain": "B",
-      "resid": 1,
-      "WTAA": "S",
-      "MutTo": "all"
-    },
-    {
-      "chain": "B",
       "resid": 2,
       "WTAA": "L",
       "MutTo": "all"
@@ -135,12 +123,6 @@
       "chain": "B",
       "resid": 11,
       "WTAA": "V",
-      "MutTo": "all"
-    },
-    {
-      "chain": "C",
-      "resid": 1,
-      "WTAA": "S",
       "MutTo": "all"
     },
     {
@@ -205,11 +187,6 @@
     }
   ],
   "symmetric": [
-    [
-      "A1",
-      "B1",
-      "C1"
-    ],
     [
       "A2",
       "B2",

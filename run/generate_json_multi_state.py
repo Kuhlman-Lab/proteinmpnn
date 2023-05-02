@@ -339,13 +339,15 @@ def get_arguments() -> argparse.Namespace:
     parser.add_argument('--constraints', 
                         type=str,
                         default='',
-                        help='comma-separated list of multi-state design constraints. '
-                        'E.g. PDB1:A10-15:1+PDB2:A10-15:0.5+PDB3:B5-10:-3,PDB1:A20-25:1+PDB3:B20-25:1')
+                        help='Semicolon-separated list of multi-state design constraints. '
+                        'commas separate individual residue sets within a constraint. '
+                        'E.g. PDB1:A10-15:1,PDB2:A10-15:0.5;PDB1:A20-25:1,PDB3:B20-25:-1'
+                        'See examples/multi_state for details.')
     parser.add_argument('--designable_res',
                         default='',
                         type=str,
-                        help='PDB chain and residue numbers to mutate, separated by '
-                        'commas and/or hyphens. E.g. A10,A12-A15')
+                        help='Semicolon-separated list of PDBs with chain and residue numbers to mutate'
+                        'E.g. PDB1:A10-15,A20-25;PDB2:A10-15;PDB3:B20-25')
     parser.add_argument('--default_design_setting',
                         default='all',
                         type=str,

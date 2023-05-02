@@ -334,7 +334,7 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     #     --pos_neg_chain_list "A C"
     #     --pos_neg_chain_betas "1.0 -1.0"
 
-    if 'chain_keys' in design_spec_dict:
+    if 'chain_key' in design_spec_dict:
         print('Multiple states detected, using Multi-State Design workflow...')
         tied_positions_dict = make_pos_neg_tied_positions_dict.main(*multi_state_args(design_spec_dict, protein))
     else:

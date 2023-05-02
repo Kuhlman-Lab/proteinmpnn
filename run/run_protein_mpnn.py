@@ -174,6 +174,8 @@ def run_protein_mpnn(args):
                                             chain_idx = [masked_list_list[0].index(ctr) for ctr in chains_to_recover]
                                             native_seq_split = '/'.join([native_seq.split('/')[idx] for idx in chain_idx])
                                             scores_per_chain = {}
+                                            # make mask for per-state scoring as well
+                                            state_idx = torch.zeros(chain_encoding_all.shape, dtype=torch.bool)
 
                                             for ctr, idx in zip(chains_original, chain_idx):
                                                 # grab the indices for scoring each chain
@@ -181,15 +183,19 @@ def run_protein_mpnn(args):
                                                 chain_score = torch.sum(native_scores_per_res[score_idx], dim=-1) / torch.sum(native_mask_for_loss[score_idx], dim=-1)
                                                 chain_score = np.format_float_positional(np.float32(chain_score.cpu().data.numpy().mean()), unique=False, precision=4)
                                                 scores_per_chain[ctr] = chain_score
+                                                state_idx += score_idx
 
-                                            fsp.write('>{}, fixed_chains={}, designed_chains={}, scores_per_chain={}, model={}\n{}\n'.format(fbase, print_visible_chains, chains_original, 
-                                                                                                                                            scores_per_chain, args.model_name, native_seq_split))
+                                            state_idx = state_idx.bool()
+                                            score_per_state = torch.sum(native_scores_per_res[state_idx], dim=-1) / torch.sum(native_mask_for_loss[state_idx], dim=-1)
+                                            score_per_state = np.format_float_positional(np.float32(score_per_state.cpu().data.numpy().mean()), unique=False, precision=4)
+                                            fsp.write('>{}, fixed_chains={}, designed_chains={}, state_score={}, scores_per_chain={}, model={}\n{}\n'.format(fbase, print_visible_chains, chains_original, 
+                                                                                                                                            score_per_state, scores_per_chain, args.model_name, native_seq_split))
                     
                                             if args.af2_formatted_output:
                                                 with open(af2split, 'w') as faf2:
                                                     af2_seqs = native_seq_split.split('/')
                                                     af2_seqs = ',' + ','.join(af2_seqs)
-                                                    faf2.write(f'{af2_seqs} # {name_}, fixed_chains={print_visible_chains}, designed_chains={chains_original}, scores_per_chain={scores_per_chain}, model_name={args.model_name}\n')    
+                                                    faf2.write(f'{af2_seqs} # {name_}, fixed_chains={print_visible_chains}, designed_chains={chains_original}, state_score={score_per_state}, scores_per_chain={scores_per_chain}, model_name={args.model_name}\n')    
 
                                 if args.af2_formatted_output:
                                     with open(af2_file, 'w') as af2:
@@ -226,23 +232,32 @@ def run_protein_mpnn(args):
                                         seq_split = '/'.join([seq.split('/')[idx] for idx in chain_idx])
 
                                         scores_per_chain, seq_recovery_per_chain = {}, {}
+                                        # make mask for per-state scoring as well
+                                        state_idx = torch.zeros(chain_encoding_all.shape, dtype=torch.bool)
+                                        
                                         for ctr, idx in zip(chains_original, chain_idx):
                                                 # grab the indices for scoring each chain
-                                                score_idx = chain_encoding_all == idx + 1
+                                                score_idx = chain_encoding_all == idx + 1  # [1, L]
                                                 chain_score = torch.sum(scores_per_res[score_idx], dim=-1) / torch.sum(mask_for_loss[score_idx], dim=-1)
                                                 chain_score = np.format_float_positional(np.float32(chain_score.cpu().data.numpy().mean()), unique=False, precision=4)
                                                 scores_per_chain[ctr] = chain_score
                                                 # use this for seq recovery too
                                                 chain_seq_rec = torch.sum(seq_recovery_per_res.unsqueeze(0)[score_idx], dim=-1) / torch.sum(mask_for_loss[score_idx], dim=-1)
                                                 seq_recovery_per_chain[ctr] = np.format_float_positional(np.float32(chain_seq_rec.cpu().data.numpy().mean()), unique=False, precision=4)
+                                                state_idx += score_idx
 
-                                        fsp.write('>{}, sample={}, scores_per_chain={}, seq_recovery_per_chain={}, model={}\n{}\n'.format(fbase, b_ix, scores_per_chain,  seq_recovery_per_chain, args.model_name, seq_split))
+                                        state_idx = state_idx.bool()
+                                        score_per_state = torch.sum(scores_per_res[state_idx], dim=-1) / torch.sum(mask_for_loss[state_idx], dim=-1)
+                                        score_per_state = np.format_float_positional(np.float32(score_per_state.cpu().data.numpy().mean()), unique=False, precision=4)
+                                        seq_recovery_per_state = torch.sum(seq_recovery_per_res.unsqueeze(0)[state_idx], dim=-1) / torch.sum(mask_for_loss[state_idx], dim=-1)
+                                        seq_recovery_per_state = np.format_float_positional(np.float32(seq_recovery_per_state.cpu().data.numpy().mean()), unique=False, precision=4)
+                                        fsp.write('>{}, sample={}, state_score={}, scores_per_chain={}, state_recovery={}, seq_recovery_per_chain={}, model={}\n{}\n'.format(fbase, b_ix, score_per_state, scores_per_chain, seq_recovery_per_state, seq_recovery_per_chain, args.model_name, seq_split))
 
                                     if args.af2_formatted_output:
                                         with open(af2split, 'a') as faf2:
                                             af2_seqs = seq_split.split('/')
                                             af2_seqs = ',' + ','.join(af2_seqs)
-                                            faf2.write(f'{af2_seqs} # T={temp}, sample={b_ix}, scores_per_chain={scores_per_chain}, seq_recovery_per_chain={seq_recovery_per_chain}\n')
+                                            faf2.write(f'{af2_seqs} # T={temp}, sample={b_ix}, state_score={score_per_state}, scores_per_chain={scores_per_chain}, state_seq_recovery={seq_recovery_per_state}, seq_recovery_per_chain={seq_recovery_per_chain}\n')
 
 
                             if args.af2_formatted_output:
