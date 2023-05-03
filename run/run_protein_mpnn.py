@@ -175,7 +175,7 @@ def run_protein_mpnn(args):
                                             native_seq_split = '/'.join([native_seq.split('/')[idx] for idx in chain_idx])
                                             scores_per_chain = {}
                                             # make mask for per-state scoring as well
-                                            state_idx = torch.zeros(chain_encoding_all.shape, dtype=torch.bool)
+                                            state_idx = torch.zeros(chain_encoding_all.shape, dtype=torch.bool, device=device)
 
                                             for ctr, idx in zip(chains_original, chain_idx):
                                                 # grab the indices for scoring each chain
@@ -233,7 +233,7 @@ def run_protein_mpnn(args):
 
                                         scores_per_chain, seq_recovery_per_chain = {}, {}
                                         # make mask for per-state scoring as well
-                                        state_idx = torch.zeros(chain_encoding_all.shape, dtype=torch.bool)
+                                        state_idx = torch.zeros(chain_encoding_all.shape, dtype=torch.bool, device=device)
                                         
                                         for ctr, idx in zip(chains_original, chain_idx):
                                                 # grab the indices for scoring each chain
