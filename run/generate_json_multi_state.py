@@ -259,7 +259,6 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
                 break
             # check to see if MSD combination was successful - are all states suitably far apart?
             min_dist = self._check_for_clashes(target, chain_dict)
-            min_dist = 10.
             # randomly reorder distance spread combos if min_dist check fails
             if min_dist < 100.:
                 rand.shuffle(combos)
