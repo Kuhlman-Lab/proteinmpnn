@@ -16,8 +16,9 @@ def _scores(S, log_probs, mask):
         log_probs.contiguous().view(-1,log_probs.size(-1)),
         S.contiguous().view(-1)
     ).view(S.size())
-    scores = torch.sum(loss * mask, dim=-1) / torch.sum(mask, dim=-1)
-    return scores
+    scores_per_res = loss * mask
+    scores = torch.sum(scores_per_res, dim=-1) / torch.sum(mask, dim=-1)
+    return scores, scores_per_res
 
 def _S_to_seq(S, mask):
     alphabet = 'ACDEFGHIKLMNPQRSTVWYX'

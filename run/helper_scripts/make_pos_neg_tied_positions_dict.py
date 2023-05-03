@@ -1,42 +1,54 @@
 import argparse
+import glob
+import random
+import numpy as np
+import json
+import itertools
+from helper_scripts.make_tied_positions_dict import get_json_list, write_json
 
-def main(args):
-
-    import glob
-    import random
-    import numpy as np
-    import json
-    import itertools
+def main(json_list, homooligomer, position_list, chain_list, pos_neg_chain_list, pos_neg_chain_betas):
     
-    with open(args.input_path, 'r') as json_file:
-        json_list = list(json_file)
-    
-    homooligomeric_state = args.homooligomer
+    homooligomeric_state = homooligomer
 
     if homooligomeric_state == 0:
-        tied_list = [[int(item) for item in one.split()] for one in args.position_list.split(",")]
-        global_designed_chain_list = [str(item) for item in args.chain_list.split()]
-        my_dict = {}
-        for json_str in json_list:
-            result = json.loads(json_str)
-            all_chain_list = sorted([item[-1:] for item in list(result) if item[:9]=='seq_chain']) #A, B, C, ...
-            tied_positions_list = []
-            for i, pos in enumerate(tied_list[0]):
-                temp_dict = {}
-                for j, chain in enumerate(global_designed_chain_list):
-                    temp_dict[chain] = [tied_list[j][i]] #needs to be a list
-                tied_positions_list.append(temp_dict)
-            my_dict[result['name']] = tied_positions_list
-    else:
-        if args.pos_neg_chain_list:
-            chain_list_input = [[str(item) for item in one.split()] for one in args.pos_neg_chain_list.split(",")]
-            chain_betas_input = [[float(item) for item in one.split()] for one in args.pos_neg_chain_betas.split(",")]
+        # NOTE: this is used for multi-state design workflow
+        # TODO fix bug in tied chain length padding here
+
+        if pos_neg_chain_list:
+            chain_list_input = [[str(item) for item in one.split()] for one in pos_neg_chain_list.split(",")]
+            chain_betas_input = [[float(item) for item in one.split()] for one in pos_neg_chain_betas.split(",")]
             chain_list_flat = [item for sublist in chain_list_input for item in sublist]
             chain_betas_flat = [item for sublist in chain_betas_input for item in sublist]
             chain_betas_dict = dict(zip(chain_list_flat, chain_betas_flat))
         my_dict = {}
-        for json_str in json_list:
-            result = json.loads(json_str)
+        tied_list = [[int(item) for item in one.split()] for one in position_list.split(",")]
+
+        chidx = 0  # increments with every chain processed to select tied_list of positions
+        for result in json_list:
+            all_chain_list = sorted([item[-1:] for item in list(result) if item[:9]=='seq_chain']) #A, B, C, ...
+            tied_positions_list = []
+            chain_length = len(result[f"seq_chain_{all_chain_list[0]}"])
+            for chains in chain_list_input:
+                for i, pos in enumerate(tied_list[chidx]):  # need to use the right tied_list of positions b/c chains can be different lengths
+                    temp_dict = {}
+                    for j, chain in enumerate(chains):
+                        if pos_neg_chain_list and chain in chain_list_flat:
+                            temp_dict[chain] = [[pos], [chain_betas_dict[chain]]]  # need to use correct chain positions b/c chains can be different lengths
+                        else: 
+                            temp_dict[chain] = [[pos], [1.0]] #first list is for residue numbers, second list is for weights for the energy, +ive and -ive design
+                    tied_positions_list.append(temp_dict)
+                chidx += len(chains)
+            my_dict[result['name']] = tied_positions_list
+
+    else:
+        if pos_neg_chain_list:
+            chain_list_input = [[str(item) for item in one.split()] for one in pos_neg_chain_list.split(",")]
+            chain_betas_input = [[float(item) for item in one.split()] for one in pos_neg_chain_betas.split(",")]
+            chain_list_flat = [item for sublist in chain_list_input for item in sublist]
+            chain_betas_flat = [item for sublist in chain_betas_input for item in sublist]
+            chain_betas_dict = dict(zip(chain_list_flat, chain_betas_flat))
+        my_dict = {}
+        for result in json_list:
             all_chain_list = sorted([item[-1:] for item in list(result) if item[:9]=='seq_chain']) #A, B, C, ...
             tied_positions_list = []
             chain_length = len(result[f"seq_chain_{all_chain_list[0]}"])
@@ -44,15 +56,13 @@ def main(args):
                 for i in range(1,chain_length+1):
                     temp_dict = {}
                     for j, chain in enumerate(chains):
-                        if args.pos_neg_chain_list and chain in chain_list_flat:
+                        if pos_neg_chain_list and chain in chain_list_flat:
                             temp_dict[chain] = [[i], [chain_betas_dict[chain]]]
                         else: 
                             temp_dict[chain] = [[i], [1.0]] #first list is for residue numbers, second list is for weights for the energy, +ive and -ive design
                     tied_positions_list.append(temp_dict)
             my_dict[result['name']] = tied_positions_list
- 
-    with open(args.output_path, 'w') as f:
-        f.write(json.dumps(my_dict) + '\n')
+    return my_dict
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -65,7 +75,10 @@ if __name__ == "__main__":
     argparser.add_argument("--pos_neg_chain_betas", type=str, default='', help="Chain beta list for the chain lists provided; 1.0 for the positive design, -0.1 or -0.5 for negative, 0.0 means do not use that chain info")
 
     args = argparser.parse_args()
-    main(args)
+    json_list = get_json_list(args.input_path)
+    my_dict = main(json_list, args.homooligomer, args.position_list, args.chain_list, 
+                   args.pos_neg_chain_list, args.pos_neg_chain_betas)
+    write_json(args.output_path, my_dict)
 
 
 #e.g. output

@@ -3,7 +3,7 @@ import os, glob, re
 from typing import Dict
 import numpy as np
 from protein_mpnn.protein_mpnn_utils import StructureDatasetPDB, parse_PDB
-from helper_scripts import make_fixed_positions_dict, make_tied_positions_dict
+from helper_scripts import make_fixed_positions_dict, make_tied_positions_dict, make_pos_neg_tied_positions_dict
 
 # Model config for storing hyperparameters
 MODEL_CONFIG = {'hidden_dim': 128,
@@ -150,6 +150,37 @@ def tied_positions_args(design_spec_dict, protein):
 
     return [protein], 0, ', '.join(position_list), ' '.join(list(chain_positions.keys()))
 
+def multi_state_args(design_spec_dict, protein):
+    """Parsing multi-state arguments including tied_betas and tied chains"""
+    symmetric_res = design_spec_dict['symmetric']
+    chain_positions = {}
+    chain_pairs = []
+    for res in symmetric_res:
+        split_res = []
+        tmp_chain_pair = []
+        for res_item in res:
+            split_item = re.split('(\d+)', res_item)
+            chain_id = split_item[0]
+            res_idx = split_item[1]
+            split_res.append( (chain_id, res_idx) )
+            if chain_id not in tmp_chain_pair:
+                tmp_chain_pair.append(chain_id)
+        if tmp_chain_pair not in chain_pairs:
+            chain_pairs.append(tmp_chain_pair)
+        for res_item in split_res:
+            if res_item[0] not in chain_positions:
+                chain_positions[res_item[0]] = []
+                
+            if res_item[1] not in chain_positions[res_item[0]]:
+                chain_positions[res_item[0]].append(res_item[1])
+
+    position_list = [' '.join(chain_pos) for chain_pos in list(chain_positions.values())]
+    chain_betas = [[design_spec_dict['tied_betas'][c] for c in cp] for cp in chain_pairs]  
+    chain_pairs = [' '.join(cp) for cp in chain_pairs]
+    chain_betas = [' '.join(map(str, cb)) for cb in chain_betas]
+
+    return [protein], 0, ', '.join(position_list), ' '.join(list(chain_positions.keys())), ', '.join(chain_pairs), ', '.join(chain_betas)
+
 
 def _form_omit_AA_list(res):
     alphabet = set('ACDEFGHIKLMNPQRSTVWY')
@@ -278,7 +309,6 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     fixed_positions_dict = make_fixed_positions_dict.main(*fixed_positions_args(design_spec_dict, protein))
     if fixed_positions_dict == {}:
         fixed_positions_dict = None
-    #fixed_positions_dict = None
 
     # Loaded from tied_positions_json
     # Usage in Examples 5 and 6 (VAN + CA)
@@ -292,7 +322,24 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     #     --output_path doesn't matter
     #     --chain_list "A C"
     #     --position_list "1 2 3 4 5 6 7 8, 1 2 3 4 5 6 7 8" 
-    tied_positions_dict = make_tied_positions_dict.main(*tied_positions_args(design_spec_dict, protein))
+
+    # Added option for multi-state design use triggered by presence of tied_betas specs
+    # This replaces the make_tied_positions.py step with:
+    # /helper_scripts/make_pos_neg_tied_positions.py
+    # Input Args:
+    #     --input_path see Note 1
+    #     --output_path doesn't matter
+    #     --chain_list "A C"
+    #     --position_list "1 2 3 4 5 6 7 8, 1 2 3 4 5 6 7 8" 
+    #     --pos_neg_chain_list "A C"
+    #     --pos_neg_chain_betas "1.0 -1.0"
+
+    if 'chain_key' in design_spec_dict:
+        print('Multiple states detected, using Multi-State Design workflow...')
+        tied_positions_dict = make_pos_neg_tied_positions_dict.main(*multi_state_args(design_spec_dict, protein))
+    else:
+        # print('No tied betas detected, using Standard workflow...')
+        tied_positions_dict = make_tied_positions_dict.main(*tied_positions_args(design_spec_dict, protein))
     if tied_positions_dict == {}:
         tied_positions_dict = None
 
