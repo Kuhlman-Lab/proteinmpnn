@@ -7,13 +7,14 @@ import numpy as np
 from typing import Optional, Sequence, Tuple, Dict
 from Bio.PDB import PDBParser, PDBIO, Select, Structure
 import itertools
+from random import Random
 
 from generate_json import FileArgumentParser, ProteinDesignInputFormatter
 
 
 class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
     def __init__(self, pdb_dir: str, designable_res: str = '', default_design_setting: str = 'all', 
-                 constraints: str = '', gap: float = 1000.) -> None:
+                 constraints: str = '', gap: float = 1000., cluster_center: str = '', cluster_radius: float = 10.0, validation_tries: int = 0) -> None:
         self.CHAIN_IDS = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
         self.AA3 = ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 
                     'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR', 'XXX']
@@ -32,6 +33,7 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
                 self.parser = PDBParser(QUIET=True)
 
         self.design_default = default_design_setting
+        self.validate = validation_tries
         
         # combine all PDBs into one shared object
         self.msd_pdb = ''
@@ -43,6 +45,11 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
         else:
             self.design_res = []
 
+        # update design residues based on cluster input
+        if cluster_center:
+            cluster_mut = self.parse_cluster_center(cluster_center, cluster_radius)
+            self.design_res += cluster_mut
+
         # handle parsing multi-state tied residues as if they were symmetry rules 
         self.beta_dict = {}
         if constraints:
@@ -50,6 +57,50 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
         else:
             self.symmetric_res = []
 
+        # need to update design residues based on whether any cluster mutations are covered by symmetry constraints
+        self.update_design_res(cluster_mut)
+
+
+    def _get_cluster_neighbors(self, center: str, cluster_radius: float) -> Sequence[str]:
+        
+        # Chain and residue number for center
+        center_ch, center_res = center
+        pdb_id = self.msd_pdb[:-4]
+        pdb_file = os.path.join(self.pdb_dir, pdb_id + '.pdb')
+        pdb_struct = self.parser.get_structure(id=pdb_id, file=pdb_file)
+        
+        # Get list of chains
+        chains = list(pdb_struct.get_chains())
+        # Determine cluster location
+        for chain in chains:
+            # Find correct chain
+            if chain.id == center_ch:
+                for residue in chain.get_residues():
+                    # Find correct residue
+                    if residue.id[1] == center_res:
+                        for atom in residue.get_atoms():
+                            # Find the CA atom and get its coords
+                            if atom.get_name() == 'CA':
+                                center_pos = atom.get_coord()
+                                break
+                        break
+                break
+
+        # Determine neighbors using cluster radius        
+        neighbors = []
+        for chain in chains:
+            for residue in chain.get_residues():
+                # Residue chain and number
+                res_ch, res_num = chain.id, residue.id[1]
+                
+                for atom in residue.get_atoms():
+                    # Find the CA atom and compute distance from center
+                    if atom.get_name() == 'CA':
+                        dist2center = np.sqrt(np.sum((atom.get_coord() - center_pos) ** 2) + 1e-12)
+                        # If distance is less than radius, then add to neighbor list
+                        if dist2center <= cluster_radius:
+                            neighbors.append( (res_ch, res_num) )
+        return neighbors
 
     def _check_res_validity(self, res_item: str) -> Tuple[str, int]:
         split_item = [item for item in re.split('(\d+)', res_item) if item]
@@ -100,64 +151,7 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
 
         return symmetry_dict
 
-    def combine_pdbs(self, gap):
-        """ Combines list of PDBs into one shared PDB file as needed by MPNN (separated by 1000A each). """
-        initial_pdb = self.pdb_list[0]
-        target = self.parser.get_structure('main', initial_pdb)
-
-        init_ch = [c.id for c in target.get_chains()]
-        init_dict = {}
-        for a, b in zip(init_ch, init_ch):
-            init_dict[a] = b
-
-        chain_dict = {initial_pdb[:-4]: init_dict}
-        no_duplicates = [c.id for c in target.get_chains()]
-        io = PDBIO()
-        # sort combos by sum of increments to reduce spread and chance of PDB overflow
-        combos = sorted(itertools.product([0, 1, 2, 3, 4, 5], repeat=3), key=lambda x: (sum(x), x))
-        chain_inc = 0
-        
-        for model in target:
-            for inc, pdb in enumerate(self.pdb_list[1:]):
-                mobile = self.parser.get_structure('mobile', pdb)
-                mobile_dict = {}
-                for m in mobile:
-                    for chain in m:
-                        # rename chains to avoid conflicts b/w files
-                        tmp = chain.id
-                        while chain.id in no_duplicates:
-                            chain.id = self.CHAIN_IDS[chain_inc]
-                            chain_inc += 1
-                        mobile_dict[tmp] = chain.id
-                        no_duplicates.append(chain.id)
-                        # add chain to target structure
-                        model.add(chain)
-                        # increment chain to be far away from other chains
-                        inc_3d = np.array(combos[inc + 1]) * gap
-
-                        for residue in chain:
-                            for atom in residue:
-                                if atom.is_disordered():
-                                    try:
-                                        atom.disordered_select("A")
-                                    except KeyError:
-                                        raise ValueError('Failed to resolve disordered residues')
-                                atom.set_coord(atom.get_coord() + inc_3d)
-
-                chain_dict[pdb[:-4]] = mobile_dict
-
-        # saving modified PDB for future use
-        msd_dir = os.path.join(self.pdb_dir, 'msd')
-        if not os.path.isdir(msd_dir):
-            os.mkdir(msd_dir)
-        
-        self.check_structure(target)
-        io.set_structure(target)
-        io.save(os.path.join(msd_dir, 'msd.pdb'), select=NotDisordered())
-        self.msd_pdb = os.path.join(msd_dir, 'msd.pdb')
-        return chain_dict
-    
-    def check_structure(self, target: Structure) -> bool:
+    def _check_structure(self, target: Structure) -> bool:
         atoms = target.get_atoms()
         for a in atoms:
             coords = a.get_coord()
@@ -169,6 +163,124 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
         chains = [c for c in chains]
         if len(chains) > 62:
             raise ValueError('MSD intermediate is too big for PDB format - try reducing number of states used at once')
+
+    def _check_for_clashes(self, target: Structure, chain_dict: dict) -> float:
+        """Calculates minimum distance between the selected chain and the other states in the multi-state"""
+        min_dist = 1E8
+        for _, values in chain_dict.items():
+            # pull out the chains for each state and check them against all other chains - keep min distance
+            values = values.values()
+            for model in target:
+                all_chains = [c for c in model.get_chains()]
+                sel_chains = [c for c in all_chains if c.id in values]
+                other_chains = [c for c in all_chains if c not in sel_chains]
+                for sc in sel_chains:
+                    for ot in other_chains:
+                        for sel_atom in sc.get_atoms():
+                            for ot_atom in ot.get_atoms():
+                                dist = sel_atom - ot_atom
+                                if dist < min_dist:
+                                    min_dist = dist
+
+        return min_dist
+
+    def update_design_res(self, cluster_mutations: Sequence[Tuple[str, int]]):
+        """Checks to see if any mutations added by cluster selection have constraints on them - if so, add the matching residues to self.design_res"""
+        for sr in self.symmetric_res:  # iterate over symmetry constraints
+            items = sr.values()
+            for cm in cluster_mutations:  # iterate over cluster mutation list
+                for it in items:  # iterate over chains within a constraint
+                    if cm in it:
+                        cm_idx = it.index(cm)  # get idx of mutation for retrieving matching pairs
+                        for add_item in items:
+                            if cm_idx < len(add_item):  # need to account for chains of different sizes
+                                mut_to_add = add_item[cm_idx]
+                                if mut_to_add not in self.design_res and mut_to_add[1] == cm[1]:
+                                    self.design_res.append(mut_to_add)
+        
+        # sort self.design_res since cluster mutations will be all jumbled up at the end
+        self.design_res = sorted(sorted(self.design_res, key=lambda x: x[1]), key=lambda x: x[0])
+        return
+
+    def combine_pdbs(self, gap):
+        """ Combines list of PDBs into one shared PDB file as needed by MPNN (separated by 1000A each). """
+        min_dist = 0.
+        tries = 0
+        # sort combos by sum of increments to reduce spread and chance of PDB overflow
+        combos = sorted(itertools.product([0, 1, 2, 3, 4, 5], repeat=3), key=lambda x: (sum(x), x))
+        rand = Random(0)  # make seeded random shuffler
+
+        while min_dist < 100.:
+            # use first listed PDB as starting structure
+            initial_pdb = self.pdb_list[0]
+            target = self.parser.get_structure('main', initial_pdb)
+
+            init_ch = [c.id for c in target.get_chains()]
+            init_dict = {}
+            for a, b in zip(init_ch, init_ch):
+                init_dict[a] = b
+
+            chain_dict = {initial_pdb[:-4]: init_dict}
+            no_duplicates = [c.id for c in target.get_chains()]
+            io = PDBIO()
+            chain_inc = 0
+            for model in target:  # iterate over model in target pdb
+                for inc, pdb in enumerate(self.pdb_list[1:]):
+                    mobile = self.parser.get_structure('mobile', pdb)
+                    mobile_dict = {}
+                    for m in mobile:  # iterate over model in mobile pdb
+                        for chain in m:  # iterate over chain in mobile pdb
+                            # rename chains to avoid conflicts b/w files
+                            tmp = chain.id
+                            while chain.id in no_duplicates:
+                                chain.id = self.CHAIN_IDS[chain_inc]
+                                chain_inc += 1
+                            mobile_dict[tmp] = chain.id
+                            no_duplicates.append(chain.id)
+                            # add chain to target structure
+                            model.add(chain)
+                            # increment chain to be far away from other chains
+                            inc_3d = np.array(combos[inc + 1]) * gap
+                            for residue in chain:
+                                for atom in residue:
+                                    if atom.is_disordered():
+                                        try:
+                                            atom.disordered_select("A")
+                                        except KeyError:
+                                            raise ValueError('Failed to resolve disordered residues')
+                                    atom.set_coord(atom.get_coord() + inc_3d)
+
+                    chain_dict[pdb[:-4]] = mobile_dict
+            
+            # if validation is disabled, just continue outside of loop
+            if self.validate == 0:
+                print('Skipping validation - Multi-state integration complete!')
+                break
+            # check to see if MSD combination was successful - are all states suitably far apart?
+            min_dist = self._check_for_clashes(target, chain_dict)
+            min_dist = 10.
+            # randomly reorder distance spread combos if min_dist check fails
+            if min_dist < 100.:
+                rand.shuffle(combos)
+                tries += 1
+                if tries >= self.validate:  # if integration fails 5x, quit to prevent infinite loop
+                    raise RuntimeError('Multi-state integration failed all attempts due to clashes between states.')
+                print('Multi-state integration failed due to clashes between states - retrying...')
+
+
+        # saving modified PDB for future use
+        msd_dir = os.path.join(self.pdb_dir, 'msd')
+        if not os.path.isdir(msd_dir):
+            os.mkdir(msd_dir)
+        self.msd_pdb = os.path.join(msd_dir, 'msd.pdb')
+
+        if self.validate > 0:
+            self._check_structure(target)
+            print('Multi-state integration validated successfully! Saving intermediate at: %s' % (self.msd_pdb))
+
+        io.set_structure(target)
+        io.save(self.msd_pdb, select=NotDisordered())
+        return chain_dict
 
     def parse_designable_res(self, design_str: str) -> Sequence[str]:
     
@@ -189,6 +301,29 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
                     design_res += range_res
         
         return design_res
+
+    def parse_cluster_center(self, cluster_center: str, cluster_radius: float) -> Sequence[str]:
+        
+        cluster_per_state = [c for c in cluster_center.strip().split(';') if c]
+        centers = []
+
+        for cps in cluster_per_state:
+            pdb_name, clus_info = [c for c in cps.strip().split(':') if c]
+            cluster_center = [s for s in clus_info.strip().split(',') if s]
+            for item in cluster_center:
+                if "-" not in item:
+                    item_ch, item_idx = self._check_res_validity(item)
+                    item_ch = self.chain_dict[pdb_name][item_ch]
+                    centers.append( (item_ch, item_idx) )
+                else:
+                    range_res = self._check_range_validity(item, pdb_name)
+                    centers += range_res
+
+        design_res = []    
+        for center in centers:
+            design_res += self._get_cluster_neighbors(center, cluster_radius)
+        # remove duplicate chain-position pairs
+        return [*set(design_res)]
 
     def parse_constraints(self, symmetric_str: str) -> Sequence[str]:
         """Parsing MSD constraints by treating them as symmetry rules with some added complexity."""
@@ -340,19 +475,30 @@ def get_arguments() -> argparse.Namespace:
                         default='',
                         help='Semicolon-separated list of multi-state design constraints. '
                         'commas separate individual residue sets within a constraint. '
-                        'E.g. PDB1:A10-15:1,PDB2:A10-15:0.5;PDB1:A20-25:1,PDB3:B20-25:-1'
+                        'E.g. PDB1:A10-A15:1,PDB2:A10-A15:0.5;PDB1:A20-A25:1,PDB3:B20-B25:-1'
                         'See examples/multi_state for details.')
     parser.add_argument('--designable_res',
                         default='',
                         type=str,
                         help='Semicolon-separated list of PDBs with chain and residue numbers to mutate'
-                        'E.g. PDB1:A10-15,A20-25;PDB2:A10-15;PDB3:B20-25')
+                        'E.g. PDB1:A10-A15,A20-A25;PDB2:A10-A15;PDB3:B20-B25')
     parser.add_argument('--default_design_setting',
                         default='all',
                         type=str,
                         help="Default setting amino acid types that residues are "
                         "allowed to mutate to. Use 'all' to allow any amino acid "
                         "to be design. Default is 'all'.")
+    parser.add_argument('--cluster_center',
+                        default='',
+                        type=str,
+                        help="PDB chain and residue numbers which will serve as "
+                        "mutation centers. Every residue with a CA within "
+                        "--cluster_radius Angstroms will be mutatable")
+    parser.add_argument('--cluster_radius',
+                        default=10.0,
+                        type=float,
+                        help="Radius from cluster mutation centers in which to "
+                        "include residues for mutation. Default is 10.0 A.")
     parser.add_argument('--out_path',
                         default='proteinmpnn_res_specs.json',
                         type=str,
@@ -363,6 +509,10 @@ def get_arguments() -> argparse.Namespace:
                         type=float,
                         help="Gap (in Angstrom) between states in MSD intermediate structure. "
                         "Only needed if you hit the PDB overflow limit. Default is 1000.")
+    parser.add_argument('--validation_tries', default=0, type=int, help="If set to 0, MPNN will not check the MSD intermediate structure for clashes."
+                        "If set to a positive integer N, MPNN will check the structure and try up to N times to resolve the clashes."
+                        "Recommended when running MSD on a new system. Significantly slows down processing." 
+                        " If a system repeatedly fails validation, consider running fewer states at once or using smaller assemblies.")
 
     # Parse the provided arguments
     args = parser.parse_args(sys.argv[1:])
@@ -372,5 +522,6 @@ def get_arguments() -> argparse.Namespace:
 
 if __name__ == '__main__':
     args = get_arguments()
-    pdif = MultiStateProteinDesignInputFormatter(args.pdb_dir, args.designable_res, args.default_design_setting, args.constraints, args.gap)
+    pdif = MultiStateProteinDesignInputFormatter(args.pdb_dir, args.designable_res, args.default_design_setting, args.constraints, args.gap, 
+                                                 args.cluster_center, args.cluster_radius, args.validation_tries)
     pdif.generate_json(args.out_path)
