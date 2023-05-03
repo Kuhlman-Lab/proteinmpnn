@@ -58,7 +58,8 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
             self.symmetric_res = []
 
         # need to update design residues based on whether any cluster mutations are covered by symmetry constraints
-        self.update_design_res(cluster_mut)
+        if cluster_center:
+            self.update_design_res(cluster_mut)
 
 
     def _get_cluster_neighbors(self, center: str, cluster_radius: float) -> Sequence[str]:
