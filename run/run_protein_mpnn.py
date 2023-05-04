@@ -195,13 +195,13 @@ def run_protein_mpnn(args):
                                                 with open(af2split, 'w') as faf2:
                                                     af2_seqs = native_seq_split.split('/')
                                                     af2_seqs = ',' + ','.join(af2_seqs)
-                                                    faf2.write(f'{af2_seqs} # {name_}, fixed_chains={print_visible_chains}, designed_chains={chains_original}, state_score={score_per_state}, scores_per_chain={scores_per_chain}, model_name={args.model_name}\n')    
+                                                    faf2.write(f'{af2_seqs} # {name_} fixed_chains={print_visible_chains} designed_chains={chains_original} state_score={score_per_state} scores_per_chain={scores_per_chain} model_name={args.model_name}\n'.replace(',', ''))    
 
                                 if args.af2_formatted_output:
                                     with open(af2_file, 'w') as af2:
                                         af2_seqs = native_seq.split('/')
                                         af2_seqs = ','+','.join(af2_seqs)
-                                        af2.write(f'{af2_seqs} # {name_}, score={native_score_print}, fixed_chains={print_visible_chains}, designed_chains={print_masked_chains}, model_name={args.model_name}\n')
+                                        af2.write(f'{af2_seqs} # {name_} score={native_score_print} fixed_chains={print_visible_chains} designed_chains={print_masked_chains} model_name={args.model_name}\n'.replace(',', ''))
                             start = 0
                             end = 0
                             list_of_AAs = []
@@ -257,14 +257,14 @@ def run_protein_mpnn(args):
                                         with open(af2split, 'a') as faf2:
                                             af2_seqs = seq_split.split('/')
                                             af2_seqs = ',' + ','.join(af2_seqs)
-                                            faf2.write(f'{af2_seqs} # T={temp}, sample={b_ix}, state_score={score_per_state}, scores_per_chain={scores_per_chain}, state_seq_recovery={seq_recovery_per_state}, seq_recovery_per_chain={seq_recovery_per_chain}\n')
+                                            faf2.write(f'{af2_seqs} # T={temp} sample={b_ix} state_score={score_per_state} scores_per_chain={scores_per_chain} state_seq_recovery={seq_recovery_per_state} seq_recovery_per_chain={seq_recovery_per_chain}\n'.replace(',', ''))
 
 
                             if args.af2_formatted_output:
                                 with open(af2_file, 'a') as af2:
                                     af2_seqs = seq.split('/')
                                     af2_seqs = ','+','.join(af2_seqs)
-                                    af2.write(f'{af2_seqs} # T={temp}, sample={b_ix}, score={score_print}, seq_recovery={seq_rec_print}\n')
+                                    af2.write(f'{af2_seqs} # T={temp} sample={b_ix} score={score_print} seq_recovery={seq_rec_print}\n'.replace(',', ''))
             t1 = time.time()
             dt = round(float(t1-t0), 4)
             num_seqs = len(temperatures)*NUM_BATCHES*BATCH_COPIES
