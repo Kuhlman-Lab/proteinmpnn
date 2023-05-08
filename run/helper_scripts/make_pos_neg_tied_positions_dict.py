@@ -9,11 +9,8 @@ from helper_scripts.make_tied_positions_dict import get_json_list, write_json
 def main(json_list, homooligomer, position_list, chain_list, pos_neg_chain_list, pos_neg_chain_betas):
     
     homooligomeric_state = homooligomer
-
     if homooligomeric_state == 0:
         # NOTE: this is used for multi-state design workflow
-        # TODO fix bug in tied chain length padding here
-
         if pos_neg_chain_list:
             chain_list_input = [[str(item) for item in one.split()] for one in pos_neg_chain_list.split(",")]
             chain_betas_input = [[float(item) for item in one.split()] for one in pos_neg_chain_betas.split(",")]
@@ -22,24 +19,24 @@ def main(json_list, homooligomer, position_list, chain_list, pos_neg_chain_list,
             chain_betas_dict = dict(zip(chain_list_flat, chain_betas_flat))
         my_dict = {}
         tied_list = [[int(item) for item in one.split()] for one in position_list.split(",")]
-
         chidx = 0  # increments with every chain processed to select tied_list of positions
         for result in json_list:
             all_chain_list = sorted([item[-1:] for item in list(result) if item[:9]=='seq_chain']) #A, B, C, ...
             tied_positions_list = []
             chain_length = len(result[f"seq_chain_{all_chain_list[0]}"])
-            for chains in chain_list_input:
-                for i, pos in enumerate(tied_list[chidx]):  # need to use the right tied_list of positions b/c chains can be different lengths
+            for chains, t_list in zip(chain_list_input, tied_list):  # this is the list of constraints
+                for i, pos in enumerate(tied_list[chidx]):  # this is the list of tied_positions for a given constraint ?
                     temp_dict = {}
                     for j, chain in enumerate(chains):
+                        # final_pos = pos  # how this used to work
+                        final_pos = tied_list[chidx + j][i]  # fixed bug in bidirectional coding failing to work in opposite direction
                         if pos_neg_chain_list and chain in chain_list_flat:
-                            temp_dict[chain] = [[pos], [chain_betas_dict[chain]]]  # need to use correct chain positions b/c chains can be different lengths
+                            temp_dict[chain] = [[final_pos], [chain_betas_dict[chain]]]  # need to use correct chain positions b/c chains can be different lengths
                         else: 
-                            temp_dict[chain] = [[pos], [1.0]] #first list is for residue numbers, second list is for weights for the energy, +ive and -ive design
+                            temp_dict[chain] = [[final_pos], [1.0]] #first list is for residue numbers, second list is for weights for the energy, +ive and -ive design
                     tied_positions_list.append(temp_dict)
                 chidx += len(chains)
             my_dict[result['name']] = tied_positions_list
-
     else:
         if pos_neg_chain_list:
             chain_list_input = [[str(item) for item in one.split()] for one in pos_neg_chain_list.split(",")]
