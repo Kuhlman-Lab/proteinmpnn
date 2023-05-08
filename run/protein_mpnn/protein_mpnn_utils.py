@@ -1071,7 +1071,11 @@ class ProteinMPNN(nn.Module):
                     # sampling options from the multinomial distribution based on probs weighting
                     probs = probs.squeeze()
                     p_shape = probs.shape
-                    S_t_repeat = torch.multinomial(flat_probs, 1).squeeze(-1)
+                    try:
+                        S_t_repeat = torch.multinomial(flat_probs, 1).squeeze(-1)
+                    except RuntimeError:
+                        print('***  Invalid multinomial distribution (sum of probabilities <= 0). This means there is NO valid bidirectional AA combo to choose from - check your AA constraints  ***')
+                        quit()
                     # extract idx of each AA from prob sampling by reverse-engineering the flatten operation
                     prob_b = S_t_repeat % p_shape[0]
                     prob_a = (S_t_repeat - prob_b) / p_shape[0]
