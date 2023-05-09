@@ -112,6 +112,8 @@ def run_protein_mpnn(args):
                 split_af2 = [os.path.join(output_folder, fi + '.csv') for fi in design_specs_dict['chain_key'].keys()]
             
             print(f'Generating sequences for: {name_}')
+            if args.bidirectional:
+                print(f'Bidirectional coding requested for: {name_}')
             t0 = time.time()
             with open(ali_file, 'w') as f:
                 for temp in temperatures:
@@ -124,7 +126,8 @@ def run_protein_mpnn(args):
                         if tied_positions_dict == None:
                             sample_dict = model.sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temerature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
                         else:
-                            sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), tied_pos=tied_pos_list_of_lists_list[0], tied_beta=tied_beta, bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
+                            sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), 
+                                                            tied_pos=tied_pos_list_of_lists_list[0], tied_beta=tied_beta, bias_by_res=bias_by_res_all, invert_probs=args.destabilize, bidir=args.bidirectional, bidir_table_dir=model_weight_dir)
                         S_sample = sample_dict["S"]
                         log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
                         mask_for_loss = mask*chain_M*chain_M_pos
@@ -449,6 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("--af2_formatted_output", action='store_true', help="Whether or not to include another output file that is in AF2 format for direct structure prediction after design.")
     parser.add_argument("--global_omit_AAs", type=str, default='X', help='AAs to globally omit from all designable positions (e.g. PC for no proline or cysteine). Note that it is generally advisable to include X in this list. Default is X.')
     parser.add_argument('--experimental', action='store_true', help='Enables experimental parsing of allowable mutations')
+    parser.add_argument('--bidirectional', action='store_true', help="Enable bidirectional coding constraints. Default is off.")
 
     args = parser.parse_args()    
     run_protein_mpnn(args) 

@@ -954,8 +954,11 @@ class ProteinMPNN(nn.Module):
         return output_dict
 
 
-    def tied_sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, tied_pos=None, tied_beta=None, bias_by_res=None, invert_probs=False):
+    def tied_sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, 
+                    pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, tied_pos=None, tied_beta=None, bias_by_res=None, invert_probs=False, bidir=False, bidir_table_dir=None):
         device = X.device
+        if bidir:
+            bidir_filter = torch.load(os.path.join(bidir_table_dir, 'bidir_table.pt'), map_location=device)
         # Prepare node and edge embeddings
         E, E_idx = self.features(X, mask, residue_idx, chain_encoding_all)
         h_V = torch.zeros((E.shape[0], E.shape[1], E.shape[-1]), device=device)
@@ -969,7 +972,6 @@ class ProteinMPNN(nn.Module):
         # Decoder uses masked self-attention
         chain_mask = chain_mask*chain_M_pos*mask #update chain_M to include missing regions
         decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))) #[numbers will be smaller for places where chain_M = 0.0 and higher for places where chain_M = 1.0]
-
         new_decoding_order = []
         for t_dec in list(decoding_order[0,].cpu().data.numpy()):
             if t_dec not in list(itertools.chain(*new_decoding_order)):
@@ -979,7 +981,6 @@ class ProteinMPNN(nn.Module):
                 else:
                     new_decoding_order.append([t_dec])
         decoding_order = torch.tensor(list(itertools.chain(*new_decoding_order)), device=device)[None,].repeat(X.shape[0],1)
-
         mask_size = E_idx.shape[1]
         permutation_matrix_reverse = torch.nn.functional.one_hot(decoding_order, num_classes=mask_size).float()
         order_mask_backward = torch.einsum('ij, biq, bjp->bqp',(1-torch.triu(torch.ones(mask_size,mask_size, device=device))), permutation_matrix_reverse, permutation_matrix_reverse)
@@ -1030,29 +1031,87 @@ class ProteinMPNN(nn.Module):
             if done_flag:
                 pass
             else:
-                bias_by_res_gathered = bias_by_res[:,t,:] #[B, 21]
-                probs = F.softmax(logits-constant[None,:]*1e8+constant_bias[None,:]/temperature+bias_by_res_gathered/temperature, dim=-1)
-                if pssm_bias_flag:
-                    pssm_coef_gathered = pssm_coef[:,t]
-                    pssm_bias_gathered = pssm_bias[:,t]
-                    probs = (1-pssm_multi*pssm_coef_gathered[:,None])*probs + pssm_multi*pssm_coef_gathered[:,None]*pssm_bias_gathered
-                if pssm_log_odds_flag:
-                    pssm_log_odds_mask_gathered = pssm_log_odds_mask[:,t]
-                    probs_masked = probs*pssm_log_odds_mask_gathered
-                    probs_masked += probs * 0.001
-                    probs = probs_masked/torch.sum(probs_masked, dim=-1, keepdim=True) #[B, 21]
-                if invert_probs:
-                    probs = (1. / (probs + 1e-12)) * (1. - constant[None, :])
-                    probs = probs / torch.sum(probs)
-                if omit_AA_mask_flag:
-                    omit_AA_mask_gathered = omit_AA_mask[:,t]
-                    probs_masked = probs*(1.0-omit_AA_mask_gathered)
-                    probs = probs_masked/torch.sum(probs_masked, dim=-1, keepdim=True) #[B, 21]
-                S_t_repeat = torch.multinomial(probs, 1).squeeze(-1)
-                for t in t_list:
-                    h_S[:,t,:] = self.W_s(S_t_repeat)
-                    S[:,t] = S_t_repeat
-                    all_probs[:,t,:] = probs.float()
+                # bidirectional coding using modified tied_sample
+                if bidir and len(logit_list) == 2 and bidir_table_dir:
+                    b1, b2 = t_list  # need to keep the positions for bias terms
+                    # calculate all combinations of logits by addition (less harsh than multiplying)
+                    a, b = torch.flatten(logit_list[0]), torch.flatten(logit_list[1])
+                    probs = a.unsqueeze(1) + b.unsqueeze(0)
+
+                    # need to square all per-AA bias terms for modifying 2D prob matrix
+                    square_constant = torch.flatten(constant[None, :])
+                    square_constant = torch.outer(square_constant, square_constant)
+                    square_constant_bias = torch.flatten(constant_bias[None, :])
+                    square_constant_bias = torch.outer(square_constant_bias, square_constant_bias)
+                    square_bias_by_res_gathered = torch.outer(torch.flatten(bias_by_res[:, 0, :]), torch.flatten(bias_by_res[:, 1, :]))
+
+                    probs = probs - square_constant[None, :] * 1e8 + square_constant_bias[None,
+                                                                      :] / temperature + square_bias_by_res_gathered / temperature
+                    probs = F.softmax(probs, dim=-1)
+                    # for all bias terms, they again need to be squared into 2D - this is blunt but works
+                    if pssm_bias_flag:
+                        pssm_coef_gathered = torch.outer(pssm_coef[:, b1], pssm_coef[:, b2])
+                        pssm_bias_gathered = torch.outer(pssm_bias[:, b1], pssm_bias[:, b2])
+                        probs = (1 - pssm_multi * pssm_coef_gathered[:, None]) * probs + pssm_multi * pssm_coef_gathered[:, None] * pssm_bias_gathered
+                    if pssm_log_odds_flag:
+                        pssm_log_odds_mask_gathered = torch.outer(pssm_log_odds_mask[:, b1], pssm_log_odds_mask[:, b2])
+                        probs_masked = probs * pssm_log_odds_mask_gathered
+                        probs_masked += probs * 0.001
+                        probs = probs_masked / torch.sum(probs_masked, dim=-1, keepdim=True)  # [B, 21]
+                    if omit_AA_mask_flag:
+                        omit_AA_mask_gathered = 1 - torch.outer(torch.flatten(1 - omit_AA_mask[:, b1]), torch.flatten(1 - omit_AA_mask[:, b2]))
+                        probs_masked = probs * (1.0 - omit_AA_mask_gathered)
+                        probs = probs_masked / torch.sum(probs_masked, dim=-1, keepdim=True)  # [B, 21]
+
+                    probs = torch.nan_to_num(probs, nan=0.)  # sometimes omit_AA_mask division can make NaNs
+                    probs = probs * bidir_filter  # filter by binary table of allowed bidirectional AA combinations
+                    # need to flatten probs for easier softmax and sampling operations
+                    flat_probs = torch.flatten(probs)  # [441]
+
+                    # sampling options from the multinomial distribution based on probs weighting
+                    probs = probs.squeeze()
+                    p_shape = probs.shape
+                    try:
+                        S_t_repeat = torch.multinomial(flat_probs, 1).squeeze(-1)
+                    except RuntimeError:
+                        print('***  Invalid multinomial distribution (sum of probabilities <= 0). This means there is NO valid bidirectional AA combo to choose from - check your AA constraints  ***')
+                        quit()
+                    # extract idx of each AA from prob sampling by reverse-engineering the flatten operation
+                    prob_b = S_t_repeat % p_shape[0]
+                    prob_a = (S_t_repeat - prob_b) / p_shape[0]
+                    combo_prob = probs[prob_a.long(), prob_b.long()]
+
+                    # need to handle each half of the tied pair separately, since they can be different AAs
+                    for t, p_idx in zip(t_list, [prob_a, prob_b]):
+                        S_t_repeat = (chain_mask[:, t] * p_idx + (1 - chain_mask[:, t]) * S_true[:, t]).long()
+                        h_S[:, t, :] = self.W_s(S_t_repeat)
+                        S[:, t] = S_t_repeat
+                        all_probs[:, t, :] = combo_prob.float()
+
+                else:  # default MPNN tied decoding
+                    bias_by_res_gathered = bias_by_res[:,t,:] #[B, 21]
+                    probs = F.softmax(logits-constant[None,:]*1e8+constant_bias[None,:]/temperature+bias_by_res_gathered/temperature, dim=-1)
+                    if pssm_bias_flag:
+                        pssm_coef_gathered = pssm_coef[:,t]
+                        pssm_bias_gathered = pssm_bias[:,t]
+                        probs = (1-pssm_multi*pssm_coef_gathered[:,None])*probs + pssm_multi*pssm_coef_gathered[:,None]*pssm_bias_gathered
+                    if pssm_log_odds_flag:
+                        pssm_log_odds_mask_gathered = pssm_log_odds_mask[:,t]
+                        probs_masked = probs*pssm_log_odds_mask_gathered
+                        probs_masked += probs * 0.001
+                        probs = probs_masked/torch.sum(probs_masked, dim=-1, keepdim=True) #[B, 21]
+                    if invert_probs:
+                        probs = (1. / (probs + 1e-12)) * (1. - constant[None, :])
+                        probs = probs / torch.sum(probs)
+                    if omit_AA_mask_flag:
+                        omit_AA_mask_gathered = omit_AA_mask[:,t]
+                        probs_masked = probs*(1.0-omit_AA_mask_gathered)
+                        probs = probs_masked/torch.sum(probs_masked, dim=-1, keepdim=True) #[B, 21]
+                    S_t_repeat = torch.multinomial(probs, 1).squeeze(-1)
+                    for t in t_list:
+                        h_S[:,t,:] = self.W_s(S_t_repeat)
+                        S[:,t] = S_t_repeat
+                        all_probs[:,t,:] = probs.float()
         output_dict = {"S": S, "probs": all_probs, "decoding_order": decoding_order}
         return output_dict
 

@@ -14,7 +14,8 @@ from generate_json import FileArgumentParser, ProteinDesignInputFormatter
 
 class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
     def __init__(self, pdb_dir: str, designable_res: str = '', default_design_setting: str = 'all', 
-                 constraints: str = '', gap: float = 1000., cluster_center: str = '', cluster_radius: float = 10.0, validation_tries: int = 0) -> None:
+                 constraints: str = '', gap: float = 1000., cluster_center: str = '', cluster_radius: float = 10.0, 
+                 validation_tries: int = 0, bidirectional: bool = False) -> None:
         self.CHAIN_IDS = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
         self.AA3 = ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 
                     'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR', 'XXX']
@@ -34,6 +35,7 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
 
         self.design_default = default_design_setting
         self.validate = validation_tries
+        self.bidirectional = bidirectional
         
         # combine all PDBs into one shared object
         self.msd_pdb = ''
@@ -60,6 +62,11 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
         # need to update design residues based on whether any cluster mutations are covered by symmetry constraints
         if cluster_center:
             self.update_design_res(cluster_mut)
+
+        # if bidirectional, switch order of symmetric residues
+        if bidirectional:
+            print('Applying bidirectional coding constraints...')
+            self.apply_bidirectional()
 
 
     def _get_cluster_neighbors(self, center: str, cluster_radius: float) -> Sequence[str]:
@@ -184,6 +191,16 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
                                     min_dist = dist
 
         return min_dist
+
+    def apply_bidirectional(self):
+        """Check to see if other specs are compatible with bidirectional - if so, reorder symmetry_res to reflect this; if not, ignore them"""
+        for sr in self.symmetric_res:
+            items = sr.values()
+            # to work with bidirectional constraints, symmetry must be dimeric
+            if len(items) == 2:
+                # flip one of the position lists (doesn't matter which one) so they are designed in opposite directions
+                sr[list(sr.keys())[1]] = list(items)[1][::-1]
+        return
 
     def update_design_res(self, cluster_mutations: Sequence[Tuple[str, int]]):
         """Checks to see if any mutations added by cluster selection have constraints on them - if so, add the matching residues to self.design_res"""
@@ -513,6 +530,7 @@ def get_arguments() -> argparse.Namespace:
                         "If set to a positive integer N, MPNN will check the structure and try up to N times to resolve the clashes."
                         "Recommended when running MSD on a new system. Significantly slows down processing." 
                         " If a system repeatedly fails validation, consider running fewer states at once or using smaller assemblies.")
+    parser.add_argument('--bidirectional', action='store_true', help="Turn on bidirectional coding constraints. Default is off.")
 
     # Parse the provided arguments
     args = parser.parse_args(sys.argv[1:])
@@ -523,5 +541,5 @@ def get_arguments() -> argparse.Namespace:
 if __name__ == '__main__':
     args = get_arguments()
     pdif = MultiStateProteinDesignInputFormatter(args.pdb_dir, args.designable_res, args.default_design_setting, args.constraints, args.gap, 
-                                                 args.cluster_center, args.cluster_radius, args.validation_tries)
+                                                 args.cluster_center, args.cluster_radius, args.validation_tries, args.bidirectional)
     pdif.generate_json(args.out_path)
