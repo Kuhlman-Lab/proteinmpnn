@@ -59,6 +59,7 @@ def main(json_list, homooligomer, position_list, chain_list, pos_neg_chain_list,
                             temp_dict[chain] = [[i], [1.0]] #first list is for residue numbers, second list is for weights for the energy, +ive and -ive design
                     tied_positions_list.append(temp_dict)
             my_dict[result['name']] = tied_positions_list
+    print('@@@@', my_dict, '\n', '-' * 50)
     return my_dict
 
 if __name__ == "__main__":

@@ -155,10 +155,10 @@ def multi_state_args(design_spec_dict, protein):
     symmetric_res = design_spec_dict['symmetric']
     chain_positions = {}
     chain_pairs = []
-    for res in symmetric_res:
+    for res in symmetric_res:  # iterate through each residue pairing
         split_res = []
         tmp_chain_pair = []
-        for res_item in res:
+        for res_item in sorted(res):  # iterate over each individual residue
             split_item = re.split('(\d+)', res_item)
             chain_id = split_item[0]
             res_idx = split_item[1]
