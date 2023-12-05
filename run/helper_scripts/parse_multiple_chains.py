@@ -164,4 +164,4 @@ if __name__ == "__main__":
     argparser.add_argument("--ca", type=bool, help="Whether or not to use the CA-only models.")
 
     args = argparser.parse_args()
-    do_write(*main(**args))
+    do_write(*main(args.input_path, args.output_path, args.ca))

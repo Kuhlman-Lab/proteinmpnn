@@ -284,7 +284,7 @@ def tied_featurize(batch, device, chain_dict, fixed_position_dict=None, omit_AA_
                 pssm_bias_list.append(pssm_bias)
                 pssm_log_odds_list.append(pssm_log_odds)
                 if bias_by_res_dict:
-                    bias_by_res_list.append(bias_by_res_dict[b['name']][letter])
+                    bias_by_res_list.append(bias_by_res_dict[letter])
                 else:
                     bias_by_res_list.append(np.zeros([chain_length, 21]))
 
@@ -538,8 +538,7 @@ class StructureLoader():
         for b_idx in self.clusters:
             batch = [self.dataset[i] for i in b_idx]
             yield batch
-            
-            
+    
             
 # The following gather functions
 def gather_edges(edges, neighbor_idx):
@@ -657,7 +656,6 @@ class DecLayer(nn.Module):
             mask_V = mask_V.unsqueeze(-1)
             h_V = mask_V * h_V
         return h_V 
-
 
 
 class PositionWiseFeedForward(nn.Module):
@@ -862,8 +860,6 @@ class ProteinMPNN(nn.Module):
         log_probs = F.log_softmax(logits, dim=-1)
         return log_probs
 
-
-
     def sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, bias_by_res=None, invert_probs=False):
         device = X.device
         # Prepare node and edge embeddings
@@ -899,7 +895,6 @@ class ProteinMPNN(nn.Module):
         #chain_mask_combined = chain_mask*chain_M_pos 
         omit_AA_mask_flag = omit_AA_mask != None
 
-
         h_EX_encoder = cat_neighbors_nodes(torch.zeros_like(h_S), h_E, E_idx)
         h_EXV_encoder = cat_neighbors_nodes(h_V, h_EX_encoder, E_idx)
         h_EXV_encoder_fw = mask_fw * h_EXV_encoder
@@ -922,6 +917,7 @@ class ProteinMPNN(nn.Module):
                     h_V_t = torch.gather(h_V_stack[l], 1, t[:,None,None].repeat(1,1,h_V_stack[l].shape[-1]))
                     h_ESV_t = torch.gather(mask_bw, 1, t[:,None,None,None].repeat(1,1,mask_bw.shape[-2], mask_bw.shape[-1])) * h_ESV_decoder_t + h_EXV_encoder_t
                     h_V_stack[l+1].scatter_(1, t[:,None,None].repeat(1,1,h_V.shape[-1]), layer(h_V_t, h_ESV_t, mask_V=mask_t))
+                    
                 # Sampling step
                 h_V_t = torch.gather(h_V_stack[-1], 1, t[:,None,None].repeat(1,1,h_V_stack[-1].shape[-1]))[:,0]
                 logits = self.W_out(h_V_t) / temperature
@@ -952,7 +948,6 @@ class ProteinMPNN(nn.Module):
             S.scatter_(1, t[:,None], S_t)
         output_dict = {"S": S, "probs": all_probs, "decoding_order": decoding_order}
         return output_dict
-
 
     def tied_sample(self, X, randn, S_true, chain_mask, chain_encoding_all, residue_idx, mask=None, temperature=1.0, omit_AAs_np=None, bias_AAs_np=None, chain_M_pos=None, omit_AA_mask=None, 
                     pssm_coef=None, pssm_bias=None, pssm_multi=None, pssm_log_odds_flag=None, pssm_log_odds_mask=None, pssm_bias_flag=None, tied_pos=None, tied_beta=None, bias_by_res=None, invert_probs=False, bidir=False, bidir_table_dir=None):
@@ -1115,7 +1110,6 @@ class ProteinMPNN(nn.Module):
         output_dict = {"S": S, "probs": all_probs, "decoding_order": decoding_order}
         return output_dict
 
-
     def conditional_probs(self, X, S, mask, chain_M, residue_idx, chain_encoding_all, randn, backbone_only=False):
         """ Graph-conditioned sequence model """
         device=X.device
@@ -1174,7 +1168,6 @@ class ProteinMPNN(nn.Module):
             log_probs = F.log_softmax(logits, dim=-1)
             log_conditional_probs[:,idx,:] = log_probs[:,idx,:]
         return log_conditional_probs
-
 
     def unconditional_probs(self, X, mask, residue_idx, chain_encoding_all):
         """ Graph-conditioned sequence model """

@@ -7,7 +7,15 @@ from helper_scripts import make_fixed_positions_dict, make_tied_positions_dict, 
 
 # Model config for storing hyperparameters
 MODEL_CONFIG = {'hidden_dim': 128,
-                'num_layers': 3}
+                'num_layers': 3,
+                'n_points': 8}
+
+# List of allowed model names
+MODEL_NAMES = [
+    "v_48_002", "v_48_010", "v_48_020", "v_48_030", # vanilla models
+    "ca_48_002", "ca_48_010", "ca_48_020", # CA models
+    "s_48_002", "s_48_010", "s_48_020", "s_48_030", # soluble models
+]
 
 # Chain letter alphabet
 init_alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G','H', 'I', 'J','K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T','U', 'V','W','X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g','h', 'i', 'j','k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't','u', 'v','w','x', 'y', 'z']
@@ -275,6 +283,26 @@ def _old_form_omit_AA_list(res):
     return omit_AAs
 
 
+def new_make_tied_positions_dict(design_spec_dict, protein):
+    symmetric_res = design_spec_dict['symmetric']
+    
+    dict_list = []
+    for res in symmetric_res:
+        tmp_dict = {}
+        for res_item in res:
+            split_item = re.split('(\d+)', res_item)
+            chain_id = str(split_item[0])
+            res_idx = int(split_item[1])
+            tmp_dict[chain_id] = [res_idx]
+        dict_list.append(tmp_dict)
+    
+    tied_positions_dict = {
+        protein["name"]: dict_list,
+    }
+    
+    return tied_positions_dict
+
+
 def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein, experimental=False):
     
     # Loaded from chain_id_json
@@ -339,7 +367,8 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
         tied_positions_dict = make_pos_neg_tied_positions_dict.main(*multi_state_args(design_spec_dict, protein))
     else:
         # print('No tied betas detected, using Standard workflow...')
-        tied_positions_dict = make_tied_positions_dict.main(*tied_positions_args(design_spec_dict, protein))
+        tied_positions_dict = new_make_tied_positions_dict(design_spec_dict, protein)
+        #tied_positions_dict = make_tied_positions_dict.main(*tied_positions_args(design_spec_dict, protein))
     if tied_positions_dict == {}:
         tied_positions_dict = None
 
