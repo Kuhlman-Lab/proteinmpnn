@@ -5,4 +5,4 @@
 --sampling_temp 0.1 # specify what sampling temperatures to use
 --out_folder outs
 --design_specs_json proteinmpnn_res_specs.json
---model_name v_48_020 # specify which model to use
+--model_name v_48_010 # specify which model to use
