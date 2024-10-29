@@ -1,154 +1,131 @@
 # ProteinMPNN
+
+This repo includes the Kuhlman Lab fork of ProteinMPNN. It includes all the functionality of the original ProteinMPNN repo (linked [here](https://github.com/dauparas/ProteinMPNN)), with the following additions:
+- Improved input parsing for custom design runs
+- Multi-state design support
+- Additional utilities to provide integration with [EvoPro](https://github.com/Kuhlman-Lab/evopro)
+
 ![ProteinMPNN](https://docs.google.com/drawings/d/e/2PACX-1vTtnMBDOq8TpHIctUfGN8Vl32x5ISNcPKlxjcQJF2q70PlaH2uFlj2Ac4s3khnZqG1YxppdMr0iTyk-/pub?w=889&h=358)
 Read [ProteinMPNN paper](https://www.biorxiv.org/content/10.1101/2022.06.03.494563v1).
 
-To run ProteinMPNN clone this github repo and install Python>=3.0, PyTorch, Numpy. 
+## Installation:
 
-Full protein backbone models: `vanilla_proteinmpnn`.
+```
+git clone git@github.com:Kuhlman-Lab/proteinmpnn.git
+cd proteinmpnn
+mamba create env -f setup/proteinmpnn.yml
+```
 
-CA only models: `ca_proteinmpnn`.
+## Usage Guidelines:
 
-Code organization:
-* `vanilla_proteinmpnn/protein_mpnn_run.py` - the main script to initialialize and run the model.
-* `vanilla_proteinmpnn/protein_mpnn_utils.py` - utility functions for the main script.
-* `vanilla_proteinmpnn/helper_scripts/` - helper functions to parse PDBs, assign which chains to design, which residues to fix, adding AA bias, tying residues etc.
-* `vanilla_proteinmpnn/examples/` - simple code examples.
+### General Usage
+
+The different input arguments available for each script can be viewed by adding `-h` to your python call (e.g., `python generate_json.py -h`).
+
+### Example Cases
+
+ProteinMPNN accepts PDB files as input and produces FASTA files as output.
+
+Unlike the original repo, our ProteinMPNN organizes the different input options (aka arguments) into `.flag` files:
+- `json.flags` is used to specify design constraints, like fixed residues and symmetry
+- `proteinmpnn.flags` is used to specify prediction flags, like which sampling temperature and model variant to use.
+
+In general, there are two steps to running ProteinMPNN:
+1. Run the `generate_json.py` script and pass it the `json.flags` file.
+- This makes a new file called `proteinmpnn_res_specs.json` containing parsed design information.
+2. Run the `run_protein_mpnn.py ` script and pass it `proteinmpnn.flags` and `proteinmpnn_res_specs.json` to obtain the actual ProteinMPNN prediction.
+
+Example input and expected output files, as well as jobscripts and flag files, for many different design tasks are included in `examples/`.
+
+We also outline each task and its key arguments below.
+
+#### 1. Monomer Design
+Location: `examples/monomer/`
+Task: Design a single monomeric protein domain. This is the simplest configuration. This example will also be the most detailed, as others follow a similar format.
+
+1A. Standard Monomer Design (`examples/monomer/standard/`)
+
+The input for this run is `6MRR.pdb`, and the output will be sent to the `outs/` folder.
+
+The `json.flags` file includes only two arguments:
+```
+--pdb_dir ./ # location of the input PDB(s)
+--designable_res A1-A68 # which residues to design
+```
+The `--designable_res` argument should use the chain and numbering used in the input PDB. This field can include:
+- Individual residues (e.g., `A1,A2,A3`)
+- A range of residues (e.g., `A1-A10`)
+- A combination of both (e.g., `A1,A2,A50-A60`)
+
+The `run_protein_mpnn.sh` file shows how to run this example:
+```
+python ../../../run/generate_json.py @json.flags
+
+python ../../../run/run_protein_mpnn.py @proteinmpnn.flags
+```
+All subsequent examples will also have a matching `run_protein_mpnn.sh` file for reference.
+
+1B. Mutation Clusters (`examples/monomer/mutation_cluster/`)
+
+This protocol designs "mutation clusters" that are specified by certain seed residue(s) and a cluster radius.
+```
+--pdb_dir ./
+--cluster_center A1,A43 # accepts residues with the same format as designable_res
+--cluster_radius 10.0 # cluster radius in Angstrom. all residues within this radius of one or more cluster centers will be designable.
+```
+- Note: This protocol is only supported for single-state, non-symmetric proteins.
+
+1C. Destabilization (`examples/monomer/destabilize`)
+
+This protocol inverts the probabilities obtained from ProteinMPNN to purposely pick disfavored residues. To do this, simply add the flag `--destabilize` to the `proteinmpnn.flags` file. For more useful negative state design with multiple constraints, see the `Multi-state Design` section.
+
+#### 2. Complex Design
+Location: `examples/complex/`
+Task: Design proteins with multiple chains, with or without symmetry.
+
+2A. Heterooligomers (`examples/complex/heterooligomer/`)
+
+Heterooligomers can be designed by simply adding multiple sets of designable residues:
+`--designable_res A43-A185,B43-B185,C43-C185`. Note that the chain ID is required before each and every residue number.
+
+2B. Homooligomers (`examples/complex/homooligomer/`)
+
+Homooligomers require us to add a new option to the `json.flags` file called `--symmetric_res`. For example:
+```
+--pdb_dir ./
+--designable_res A7-A183,B7-B183
+--symmetric_res A7-A183:B7-B183
+```
+Symmetric sets of residues with arbitrary symmetries are specified by separating them with `:`. Note that ALL residues included in `--symmetric_res` MUST be included in `--designable_res` to be designed, but the inverse is NOT true. In other words, you can design symmetric and non-symmetric residues within the same run if desired.
+
+More examples:
+```
+--symmetric_res A1-A10:B1-B10:C1-C10 # 3-fold symmetry across chains A/B/C
+--symmetric_res A1-A5:B1-B5,A5-A10:C5-C10 # two different 2-fold symmetries: one between chains A/B, another between chains B/C
+```
+
+#### 3. Multi-state Design
+3A. Single constraint
+3B. Multiple constraint
+3C. Bidirectional constraint
+
+#### 4. Other Protocols
+    4A. Mutation pair sweep
+
+
 -----------------------------------------------------------------------------------------------------
-Input flags:
-```
-argparser.add_argument("--path_to_model_weights", type=str, default="", help="Path to model weights folder;")
-argparser.add_argument("--model_name", type=str, default="v_48_020", help="ProteinMPNN model name: v_48_002, v_48_010, v_48_020, v_48_030; v_48_010=version with 48 edges 0.10A noise")
 
-argparser.add_argument("--save_score", type=int, default=0, help="0 for False, 1 for True; save score=-mean[log_probs] to npy files")
-argparser.add_argument("--save_probs", type=int, default=0, help="0 for False, 1 for True; save MPNN predicted probabilites per position")
-argparser.add_argument("--score_only", type=int, default=0, help="0 for False, 1 for True; score input backbone-sequence pairs")
-argparser.add_argument("--conditional_probs_only", type=int, default=0, help="0 for False, 1 for True; output conditional probabilities p(s_i given the rest of the sequence and backbone)")
-argparser.add_argument("--conditional_probs_only_backbone", type=int, default=0, help="0 for False, 1 for True; if true output conditional probabilities p(s_i given backbone)")
-argparser.add_argument("--unconditional_probs_only", type=int, default=0, help="0 for False, 1 for True; output unconditional probabilities p(s_i given backbone) in one forward pass")
+## Code organization:
+* `run/run_protein_mpnn.py` - the main script to initialialize and run the model.
+* `run/generate_json.py` - function to automatically generate json of design constraints.
+* `run/helper_scripts/` - helper functions to parse PDBs, assign which chains to design, which residues to fix, adding AA bias, tying residues etc.
+* `examples/` - simple example inputs/outputs and runscripts for different tasks.
+* `model_weights/` - trained proteinmpnn model weights.
+    * `v_48_...` - vanilla proteinmpnn models trained at different noise levels.
+    * `s_48_...` - solublempnn models trained at different noise levels.
+    * `ca_48_...` - Ca-only models trained at different noise levels.
 
-argparser.add_argument("--backbone_noise", type=float, default=0.00, help="Standard deviation of Gaussian noise to add to backbone atoms during the inference.")
-argparser.add_argument("--num_seq_per_target", type=int, default=1, help="Number of sequences to generate per target.")
-argparser.add_argument("--batch_size", type=int, default=1, help="Batch size when using GPUs.")
-argparser.add_argument("--max_length", type=int, default=20000, help="Maximum sequence length.")
-argparser.add_argument("--sampling_temp", type=str, default="0.1", help="A string of temperatures, 0.1 0.3 0.5. Sampling temperature for amino acids, T=0.0 means taking argmax, T>>1.0 means sampling randomly.")
 
-argparser.add_argument("--out_folder", type=str, help="Path to a folder to output sequences, e.g. /home/out/")
-argparser.add_argument("--pdb_path", type=str, default='', help="Path to a single PDB to be designed.")
-argparser.add_argument("--pdb_path_chains", type=str, default='', help="Define which chains need to be designed for a single PDB.")
-argparser.add_argument("--jsonl_path", type=str, help="Path to a folder with parsed PDBs into jsonl.")
-argparser.add_argument("--chain_id_jsonl",type=str, default='', help="Path to a dictionary specifying which chains need to be designed and which ones are fixed, if not specied all chains will be designed.")
-argparser.add_argument("--fixed_positions_jsonl", type=str, default='', help="Path to a dictionary with fixed positions.")
-argparser.add_argument("--omit_AAs", type=list, default='X', help="Specify which amino acids should be omitted in the generated sequence, e.g. 'AC' would omit alanine and cystine.")
-argparser.add_argument("--bias_AA_jsonl", type=str, default='', help="Path to a dictionary which specifies AA composion bias, e.g. {A: -1.1, F: 0.7} would make A less likely and F more likely.")
-argparser.add_argument("--bias_by_res_jsonl", default='', help="Path to dictionary with per position bias.")
-argparser.add_argument("--omit_AA_jsonl", type=str, default='', help="Path to a dictionary which specifies which amino acids need to be omited from design at specific chain indices.")
-argparser.add_argument("--pssm_jsonl", type=str, default='', help="Path to a dictionary with pssm.")
-argparser.add_argument("--pssm_multi", type=float, default=0.0, help="A value between [0.0, 1.0], 0.0 means do not use pssm, 1.0 ignore MPNN predictions.")
-argparser.add_argument("--pssm_threshold", type=float, default=0.0, help="A value between -inf + inf to restric per position AAs.")
-argparser.add_argument("--pssm_log_odds_flag", type=int, default=0, help="0 for False, 1 for True.")
-argparser.add_argument("--pssm_bias_flag", type=int, default=0, help="0 for False, 1 for True.")
-argparser.add_argument("--tied_positions_jsonl", type=str, default='', help="Path to a dictionary with tied positions for symmetric design.")
-```
------------------------------------------------------------------------------------------------------
-Example from `vanilla_proteinmpnn/examples/` to design a single PDB file:
-```
-path_to_PDB="../PDB_complexes/pdbs/3HTN.pdb"
+## License
 
-output_dir="../PDB_complexes/example_3_outputs"
-if [ ! -d $output_dir ]
-then
-    mkdir -p $output_dir
-fi
-
-chains_to_design="A B" #design only chains A and B while using the context of other chains
-
-python ../protein_mpnn_run.py \
-        --pdb_path $path_to_PDB \
-        --pdb_path_chains "$chains_to_design" \
-        --out_folder $output_dir \
-        --num_seq_per_target 2 \
-        --sampling_temp "0.1" \
-        --batch_size 1
-```
------------------------------------------------------------------------------------------------------
-Example from `vanilla_proteinmpnn/examples/` to design some monomers:
-```
-folder_with_pdbs="../PDB_monomers/pdbs/"
-
-output_dir="../PDB_monomers/example_1_outputs"
-if [ ! -d $output_dir ]
-then
-    mkdir -p $output_dir
-fi
-
-path_for_parsed_chains=$output_dir"/parsed_pdbs.jsonl"
-
-python ../helper_scripts/parse_multiple_chains.py --input_path=$folder_with_pdbs --output_path=$path_for_parsed_chains
-
-python ../protein_mpnn_run.py \
-        --jsonl_path $path_for_parsed_chains \
-        --out_folder $output_dir \
-        --num_seq_per_target 2 \
-        --sampling_temp "0.1" \
-        --batch_size 1
-```
------------------------------------------------------------------------------------------------------
-Example from `vanilla_proteinmpnn/examples/` to design some homomers:
-```
-folder_with_pdbs="../PDB_homooligomers/pdbs/"
-
-output_dir="../PDB_homooligomers/example_6_outputs"
-if [ ! -d $output_dir ]
-then
-    mkdir -p $output_dir
-fi
-
-path_for_parsed_chains=$output_dir"/parsed_pdbs.jsonl"
-path_for_tied_positions=$output_dir"/tied_pdbs.jsonl"
-
-python ../helper_scripts/parse_multiple_chains.py --input_path=$folder_with_pdbs --output_path=$path_for_parsed_chains
-
-python ../helper_scripts/make_tied_positions_dict.py --input_path=$path_for_parsed_chains --output_path=$path_for_tied_positions --homooligomer 1
-
-python ../protein_mpnn_run.py \
-        --jsonl_path $path_for_parsed_chains \
-        --tied_positions_jsonl $path_for_tied_positions \
-        --out_folder $output_dir \
-        --num_seq_per_target 2 \
-        --sampling_temp "0.2" \
-        --batch_size 1
-```
------------------------------------------------------------------------------------------------------
-Example from `vanilla_proteinmpnn/examples/` to design some complexes:
-```
-folder_with_pdbs="../PDB_complexes/pdbs/"
-
-output_dir="../PDB_complexes/example_4_outputs"
-if [ ! -d $output_dir ]
-then
-    mkdir -p $output_dir
-fi
-
-path_for_parsed_chains=$output_dir"/parsed_pdbs.jsonl"
-path_for_assigned_chains=$output_dir"/assigned_pdbs.jsonl"
-path_for_fixed_positions=$output_dir"/fixed_pdbs.jsonl"
-chains_to_design="A C"
-#The first amino acid in the chain corresponds to 1 and not PDB residues index for now.
-fixed_positions="1 2 3 4 5 6 7 8 23 25, 10 11 12 13 14 15 16 17 18 19 20 40" #fixing/not designing residues 1 2 3...25 in chain A and residues 10 11 12...40 in chain C
-
-python ../helper_scripts/parse_multiple_chains.py --input_path=$folder_with_pdbs --output_path=$path_for_parsed_chains
-
-python ../helper_scripts/assign_fixed_chains.py --input_path=$path_for_parsed_chains --output_path=$path_for_assigned_chains --chain_list "$chains_to_design"
-
-python ../helper_scripts/make_fixed_positions_dict.py --input_path=$path_for_parsed_chains --output_path=$path_for_fixed_positions --chain_list "$chains_to_design" --position_list "$fixed_positions"
-
-python ../protein_mpnn_run.py \
-        --jsonl_path $path_for_parsed_chains \
-        --chain_id_jsonl $path_for_assigned_chains \
-        --fixed_positions_jsonl $path_for_fixed_positions \
-        --out_folder $output_dir \
-        --num_seq_per_target 2 \
-        --sampling_temp "0.1" \
-        --batch_size 1
-```
-
+ProteinMPNN is distributed under an MIT license, which can be found at `proteinmpnn/LICENSE`. See license file for more details.
