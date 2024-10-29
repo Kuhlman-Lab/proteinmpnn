@@ -1,7 +1,7 @@
 import argparse
 
 def main(args):
-    import glob
+    import os
     import random
     import numpy as np
     import json
@@ -9,9 +9,10 @@ def main(args):
     mpnn_alphabet = 'ACDEFGHIKLMNPQRSTVWYX'
     
     mpnn_alphabet_dict = {'A': 0,'C': 1,'D': 2,'E': 3,'F': 4,'G': 5,'H': 6,'I': 7,'K': 8,'L': 9,'M': 10,'N': 11,'P': 12,'Q': 13,'R': 14,'S': 15,'T': 16,'V': 17,'W': 18,'Y': 19,'X': 20}
-     
+    
+
     with open(args.input_path, 'r') as json_file:
-        json_list = list(json_file)   
+        json_list = list(json_file)
  
     my_dict = {}
     for json_str in json_list:
@@ -40,6 +41,9 @@ def main(args):
             bias_by_res_dict[chain] = bias_per_residue.tolist()
         my_dict[result['name']] = bias_by_res_dict
 
+    for k in my_dict['seq_0_complex']:
+        print(len(my_dict['seq_0_complex'][k][0]))
+    print(my_dict['seq_0_complex'].keys())
     with open(args.output_path, 'w') as f:
         f.write(json.dumps(my_dict) + '\n')
 

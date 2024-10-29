@@ -247,13 +247,17 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
                     mobile = self.parser.get_structure('mobile', pdb)
                     mobile_dict = {}
                     for m in mobile:  # iterate over model in mobile pdb
-                        for chain in m:  # iterate over chain in mobile pdb
+                        chain_list = [chain for chain in m]
+                        [m.detach_child(chain.id) for chain in chain_list]
+                        for chain in chain_list:  # iterate over chain in mobile pdb
                             # rename chains to avoid conflicts b/w files
-                            tmp = chain.id
-                            while chain.id in no_duplicates:
-                                chain.id = self.CHAIN_IDS[chain_inc]
+                            original_id = chain.id
+                            tmp = original_id
+                            while tmp in no_duplicates:
                                 chain_inc += 1
-                            mobile_dict[tmp] = chain.id
+                                tmp = self.CHAIN_IDS[chain_inc]
+                            chain.id = tmp
+                            mobile_dict[original_id] = chain.id
                             no_duplicates.append(chain.id)
                             # add chain to target structure
                             model.add(chain)
@@ -269,7 +273,6 @@ class MultiStateProteinDesignInputFormatter(ProteinDesignInputFormatter):
                                     atom.set_coord(atom.get_coord() + inc_3d)
 
                     chain_dict[pdb[:-4]] = mobile_dict
-            
             # if validation is disabled, just continue outside of loop
             if self.validate == 0:
                 print('Skipping validation - Multi-state integration complete!')
@@ -531,6 +534,10 @@ def get_arguments() -> argparse.Namespace:
                         "Recommended when running MSD on a new system. Significantly slows down processing." 
                         " If a system repeatedly fails validation, consider running fewer states at once or using smaller assemblies.")
     parser.add_argument('--bidirectional', action='store_true', help="Turn on bidirectional coding constraints. Default is off.")
+    parser.add_argument('--mutation_sets', 
+                        default=None, 
+                        type=str, 
+                        help='enforce arbitrary sets of mutations on specified residue sets. Give residue range and number of mutations. E.g.,A1-A15:1,B1-A15:4')
 
     # Parse the provided arguments
     args = parser.parse_args(sys.argv[1:])

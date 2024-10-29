@@ -375,12 +375,16 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
     # Loaded from omit_AA_json
     # From looking at tied_featurize, structure of the dictionary should be something like
     # omit_AA_dict[pdb_name] = {chain_letter: [(res_idx, omit_AAs), ...]}
+    #print("Making omit_AA_dict...")
     omit_AA_dict = {protein['name']: {}}
     for chain_letter in chain_alphabet:
+        #print(chain_letter,protein,  protein.get('seq_chain_' + chain_letter))
         chain_seq = protein.get('seq_chain_' + chain_letter)
+        #print("chain_seq: ", chain_seq)
         if chain_seq != None:
             omit_AA_dict[protein['name']][chain_letter] = []
             for res in design_spec_dict['designable']:
+                #print(res, chain_letter)
                 if res['chain'] == chain_letter:
                     # Determine which residues to omit
                     if res['MutTo'] != 'all':                        
@@ -388,6 +392,7 @@ def transform_inputs(design_spec_dict: Dict[str, Dict[str, np.ndarray]], protein
                             omit_AAs = _form_omit_AA_list(res)
                         else:
                             omit_AAs = _old_form_omit_AA_list(res)
+                        #print("omit_AAs: ", omit_AAs)
                         omit_AA_dict[protein['name']][chain_letter].append([res['resid'], omit_AAs])
     #print(omit_AAs)
     # Loaded from pssm_json

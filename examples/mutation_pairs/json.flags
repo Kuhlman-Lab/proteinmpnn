@@ -1,0 +1,3 @@
+--pdb_dir ./
+--designable_res A53,A114-A116,A141,B104,B118,B120,B131-B135,B145
+--default_design_setting all-C

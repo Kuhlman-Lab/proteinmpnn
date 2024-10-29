@@ -4,6 +4,7 @@ import time
 import torch
 import json
 import copy
+import pickle
 from protein_mpnn.protein_mpnn_utils import ProteinMPNN, tied_featurize, _scores, _S_to_seq
 from mpnn_utils import determine_weight_directory, MODEL_CONFIG, MODEL_NAMES, get_pdb_dataset, transform_inputs
 from generate_json import FileArgumentParser
@@ -60,6 +61,9 @@ def run_protein_mpnn(args):
         design_specs_jsons = json_list
     else:
         raise ValueError(f'The design specs json was not found: {args.design_specs_json}')
+
+    if not args.bidirectional and args.mcmc:
+        raise ValueError("MCMC cannot be enabled without bidirectional flag.")
 
     # This should be tested
     bias_AA_dict = None
@@ -131,18 +135,40 @@ def run_protein_mpnn(args):
                         pssm_multi = 0.0
                         pssm_log_odds_flag = 0
                         pssm_bias_flag = 0
-                        if tied_positions_dict == None:
-                            sample_dict = model.sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
+
+                        if args.pairwise:
+                            sample_dict, log_probs, true_chain_mask = model.pairwise_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
+                            scores, scores_per_res = sample_dict["score"], sample_dict["score_per_res"]
+                            mask_for_loss = true_chain_mask
+                            S_sample = sample_dict["S"]
                         else:
-                            sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), 
-                                                            tied_pos=tied_pos_list_of_lists_list[0], tied_beta=tied_beta, bias_by_res=bias_by_res_all, invert_probs=args.destabilize, bidir=args.bidirectional, bidir_table_dir=model_weight_dir)
-                        S_sample = sample_dict["S"]
-                        log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
-                        mask_for_loss = mask*chain_M*chain_M_pos
-                        scores, scores_per_res = _scores(S_sample, log_probs, mask_for_loss)
-                        scores = scores.cpu().data.numpy()
-                        all_probs_list.append(sample_dict["probs"].cpu().data.numpy())
+                            if tied_positions_dict == None:
+                                sample_dict = model.sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all, invert_probs=args.destabilize)
+
+                            elif args.mcmc: # MCMC based bidirectional sampling
+                                sample_dict = model.mcmc_sample(X, mask, residue_idx, chain_encoding_all, temperature=temp)                    
+
+                            else:
+                                sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, chain_M_pos=chain_M_pos, omit_AA_mask=omit_AA_mask, pssm_coef=pssm_coef, pssm_bias=pssm_bias, pssm_multi=pssm_multi, pssm_log_odds_flag=bool(pssm_log_odds_flag), pssm_log_odds_mask=pssm_log_odds_mask, pssm_bias_flag=bool(pssm_bias_flag), 
+                                                                tied_pos=tied_pos_list_of_lists_list[0], tied_beta=tied_beta, bias_by_res=bias_by_res_all, invert_probs=args.destabilize, bidir=args.bidirectional, bidir_table_dir=model_weight_dir)
+                            S_sample = sample_dict["S"]
+                            #print(sample_dict)
+
+                            log_probs = model(X, S_sample, mask, chain_M*chain_M_pos, residue_idx, chain_encoding_all, randn_2, use_input_decoding_order=True, decoding_order=sample_dict["decoding_order"])
+                            mask_for_loss = mask*chain_M*chain_M_pos
+                            scores, scores_per_res = _scores(S_sample, log_probs, mask_for_loss)
+                            scores = scores.cpu().data.numpy()
+
+                        # if args.dump_all_probs:
+                        #     all_probs_list.append(sample_dict["probs"].cpu().data.numpy())
+                        #     with open('probs.pkl', 'wb') as temp_file:
+                        #         pickle.dump(all_probs_list, temp_file)
+                        
                         all_log_probs_list.append(log_probs.cpu().data.numpy())
+                        #print(len(all_probs_list[0][0]))
+                        #with open("all_probs_list_2.txt", "w") as of:
+                        #    for probs in all_probs_list[0][0][107]:
+                        #        of.write(str(probs)+"\n")
                         S_sample_list.append(S_sample.cpu().data.numpy())
                         for b_ix in range(BATCH_COPIES):
                             masked_chain_length_list = masked_chain_length_list_list[b_ix]
@@ -291,7 +317,7 @@ def run_protein_mpnn(args):
             print(f'{num_seqs} sequences of length {total_length} generated in {dt} seconds')
 
 
-def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", backbone_noise=0.00, num_seq_per_target=1, batch_size=1, sampling_temp="0.1", af2_formatted_output=False, bidir=False, bias_AA_dict=None, bias_by_res_dict=None):
+def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", backbone_noise=0.00, num_seq_per_target=1, batch_size=1, sampling_temp="0.1", af2_formatted_output=False, bidir=False, bias_AA_dict=None, bias_by_res_dict=None, dump_probs=False):
     # Extract hyperparameters from model config
     hidden_dim = MODEL_CONFIG['hidden_dim']
     num_layers = MODEL_CONFIG['num_layers']
@@ -440,7 +466,12 @@ def run_protein_mpnn_func(pdb_dir, design_specs_json, model_name="v_48_020", bac
                         output.append((temp,b_ix,score_print,seq_rec_print,seq))
 
             outputs.append(output)
-
+            '''
+            if dump_probs:
+                all_probs_list.append(sample_dict["probs"].cpu().data.numpy())
+                with open('probs.pkl', 'wb') as temp_file:
+                    pickle.dump(all_probs_list, temp_file)
+            '''
         t1 = time.time()
         dt = round(float(t1-t0), 4)
         num_seqs = len(temperatures)*NUM_BATCHES*BATCH_COPIES
@@ -475,6 +506,8 @@ if __name__ == "__main__":
     parser.add_argument('--bidirectional', action='store_true', help="Enable bidirectional coding constraints. Default is off.")
     parser.add_argument('--bias_AA_dict', default=None, type=str, help='Path to json file containing global amino acid bias dictionary for MPNN. Default is None.')
     parser.add_argument('--bias_by_res_dict', default=None, type=str, help='Path to json file containing per residue bias dictionary for MPNN. Default is None.')
-
+    parser.add_argument('--pairwise', action='store_true', help='Enables parsing for experimental pairwise mutation clusters (experimental).')
+    parser.add_argument('--dump_all_probs', action='store_true', help='If enabled, a file (probs.pkl) containing the aa probabilities at each position is saved.')
+    parser.add_argument('--mcmc', action='store_true', help='If enabled, bidirectional coding uses MCMC routine. Must have --bidirectional flag enabled.')
     args = parser.parse_args()
     run_protein_mpnn(args) 
