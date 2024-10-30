@@ -22,8 +22,6 @@ mamba create env -f setup/proteinmpnn.yml
 
 The different input arguments available for each script can be viewed by adding `-h` to your python call (e.g., `python generate_json.py -h`).
 
-### Example Cases
-
 ProteinMPNN accepts PDB files as input and produces FASTA files as output.
 
 Unlike the original repo, our ProteinMPNN organizes the different input options (aka arguments) into `.flag` files:
@@ -35,85 +33,37 @@ In general, there are two steps to running ProteinMPNN:
 - This makes a new file called `proteinmpnn_res_specs.json` containing parsed design information.
 2. Run the `run_protein_mpnn.py ` script and pass it `proteinmpnn.flags` and `proteinmpnn_res_specs.json` to obtain the actual ProteinMPNN prediction.
 
-Example input and expected output files, as well as jobscripts and flag files, for many different design tasks are included in `examples/`.
+### Useful Flags
 
-We also outline each task and its key arguments below.
+Used in `json.flags`:
 
-#### 1. Monomer Design
-Location: `examples/monomer/`
-Task: Design a single monomeric protein domain. This is the simplest configuration. This example will also be the most detailed, as others follow a similar format.
+`--default_design_setting`: this is an optional filter to allow/disallow certain residue types during design. By default, it is set to `all`, which allows all 20 amino acids. Possible settings include:
+    `all-hydphob`: exclude hydrophobic residues (`CDEHKNPQRSTX`)
+    `all-hydphil`: exclude hydrophilic residues (`ACFGILMPVWYX`)
+    `all-CLD`: exclude specific amino acids (in this case, Cys, Leu, and Asp)
+    `L+polar`: mix-and-match amino acids and categories (in this case, allow all polar amino acids and also Leu)
 
-1A. Standard Monomer Design (`examples/monomer/standard/`)
+Used in `proteinmpnn.flags`:
+`--model_name`: specifies which ProteinMPNN model checkpoint to use. Possible options include:
+    `v_48_002`: vanilla (default) model with k=48 neighbors and 0.02A noise
+    `s_48_010`: soluble protein model with k=48 neighbors and 0.1A noise
 
-The input for this run is `6MRR.pdb`, and the output will be sent to the `outs/` folder.
+`--sampling_temp`: specifies the sampling temperature, which changes how diverse the generated sequences will be. Ranges from 0 to 1, inclusive. A temperature of 0 returns the "best" prediction every time (zero diversity), while a temperature of 1 will return completely random samples. Recommended range is 0.0 - 0.3 or so.
 
-The `json.flags` file includes only two arguments:
-```
---pdb_dir ./ # location of the input PDB(s)
---designable_res A1-A68 # which residues to design
-```
-The `--designable_res` argument should use the chain and numbering used in the input PDB. This field can include:
-- Individual residues (e.g., `A1,A2,A3`)
-- A range of residues (e.g., `A1-A10`)
-- A combination of both (e.g., `A1,A2,A50-A60`)
+### Example Cases
 
-The `run_protein_mpnn.sh` file shows how to run this example:
-```
-python ../../../run/generate_json.py @json.flags
+Example input and expected output files, as well as jobscripts and flag files, for many different design tasks are included in `examples/`. For a summary and explanation of each example, see `examples/EXAMPLES.md`. Currently supported protocols include:
 
-python ../../../run/run_protein_mpnn.py @proteinmpnn.flags
-```
-All subsequent examples will also have a matching `run_protein_mpnn.sh` file for reference.
-
-1B. Mutation Clusters (`examples/monomer/mutation_cluster/`)
-
-This protocol designs "mutation clusters" that are specified by certain seed residue(s) and a cluster radius.
-```
---pdb_dir ./
---cluster_center A1,A43 # accepts residues with the same format as designable_res
---cluster_radius 10.0 # cluster radius in Angstrom. all residues within this radius of one or more cluster centers will be designable.
-```
-- Note: This protocol is only supported for single-state, non-symmetric proteins.
-
-1C. Destabilization (`examples/monomer/destabilize`)
-
-This protocol inverts the probabilities obtained from ProteinMPNN to purposely pick disfavored residues. To do this, simply add the flag `--destabilize` to the `proteinmpnn.flags` file. For more useful negative state design with multiple constraints, see the `Multi-state Design` section.
-
-#### 2. Complex Design
-Location: `examples/complex/`
-Task: Design proteins with multiple chains, with or without symmetry.
-
-2A. Heterooligomers (`examples/complex/heterooligomer/`)
-
-Heterooligomers can be designed by simply adding multiple sets of designable residues:
-`--designable_res A43-A185,B43-B185,C43-C185`. Note that the chain ID is required before each and every residue number.
-
-2B. Homooligomers (`examples/complex/homooligomer/`)
-
-Homooligomers require us to add a new option to the `json.flags` file called `--symmetric_res`. For example:
-```
---pdb_dir ./
---designable_res A7-A183,B7-B183
---symmetric_res A7-A183:B7-B183
-```
-Symmetric sets of residues with arbitrary symmetries are specified by separating them with `:`. Note that ALL residues included in `--symmetric_res` MUST be included in `--designable_res` to be designed, but the inverse is NOT true. In other words, you can design symmetric and non-symmetric residues within the same run if desired.
-
-More examples:
-```
---symmetric_res A1-A10:B1-B10:C1-C10 # 3-fold symmetry across chains A/B/C
---symmetric_res A1-A5:B1-B5,A5-A10:C5-C10 # two different 2-fold symmetries: one between chains A/B, another between chains B/C
-```
-
-#### 3. Multi-state Design
-3A. Single constraint
-3B. Multiple constraint
-3C. Bidirectional constraint
-
-#### 4. Other Protocols
-    4A. Mutation pair sweep
-
+1. Monomer Design (with user-friendly parsing of designable residues)
+2. Binder Design
+2. Oligomer Design (with support for abitrary symmetries in homooligomers)
+3. Multi-state Design (with support for multiple complex design constraints)
 
 -----------------------------------------------------------------------------------------------------
+
+## Unit Testing
+
+TODO
 
 ## Code organization:
 * `run/run_protein_mpnn.py` - the main script to initialialize and run the model.

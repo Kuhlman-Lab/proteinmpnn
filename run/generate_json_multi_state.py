@@ -511,13 +511,13 @@ def get_arguments() -> argparse.Namespace:
     parser.add_argument('--cluster_center',
                         default='',
                         type=str,
-                        help="PDB chain and residue numbers which will serve as "
+                        help="DO NOT USE. PDB chain and residue numbers which will serve as "
                         "mutation centers. Every residue with a CA within "
                         "--cluster_radius Angstroms will be mutatable")
     parser.add_argument('--cluster_radius',
                         default=10.0,
                         type=float,
-                        help="Radius from cluster mutation centers in which to "
+                        help="DO NOT USE. Radius from cluster mutation centers in which to "
                         "include residues for mutation. Default is 10.0 A.")
     parser.add_argument('--out_path',
                         default='proteinmpnn_res_specs.json',

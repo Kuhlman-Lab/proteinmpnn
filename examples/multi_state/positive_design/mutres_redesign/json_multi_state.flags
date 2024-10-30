@@ -1,3 +1,0 @@
---pdb_dir ./
---designable_res 4GYT_dimer:A8-A17,B8-B17;4GYT_monomer:A8-A17
---constraints 4GYT_dimer:A8-A17:0.5,4GYT_dimer:B8-B17:0.5,4GYT_monomer:A8-A17:1

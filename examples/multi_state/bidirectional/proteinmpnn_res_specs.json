@@ -1,365 +1,365 @@
 {
   "sequence": {
     "B": "GTVTFHGVDPNVVKEAVSKAGAEVRVHGETVEVHVSDDNLAKKVLELVRKLAGAEVEIHS",
-    "A": "SLKDKAKSLYESATKSVKNASSEEEKKRILDTAVSELNKIPDPTAQKLSEKLERVWRSLS"
+    "C": "SLKDKAKSLYESATKSVKNASSEEEKKRILDTAVSELNKIPDPTAQKLSEKLERVWRSLS"
   },
   "designable": [
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 1,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 2,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 3,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 4,
       "WTAA": "D",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 5,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 6,
       "WTAA": "A",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 7,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 8,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 9,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 10,
       "WTAA": "Y",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 11,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 12,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 13,
       "WTAA": "A",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 14,
       "WTAA": "T",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 15,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 16,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 17,
       "WTAA": "V",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 18,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 19,
       "WTAA": "N",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 20,
       "WTAA": "A",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 21,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 22,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 23,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 24,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 25,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 26,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 27,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 28,
       "WTAA": "R",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 29,
       "WTAA": "I",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 30,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 31,
       "WTAA": "D",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 32,
       "WTAA": "T",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 33,
       "WTAA": "A",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 34,
       "WTAA": "V",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 35,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 36,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 37,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 38,
       "WTAA": "N",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 39,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 40,
       "WTAA": "I",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 41,
       "WTAA": "P",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 42,
       "WTAA": "D",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 43,
       "WTAA": "P",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 44,
       "WTAA": "T",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 45,
       "WTAA": "A",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 46,
       "WTAA": "Q",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 47,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 48,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 49,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 50,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 51,
       "WTAA": "K",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 52,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 53,
       "WTAA": "E",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 54,
       "WTAA": "R",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 55,
       "WTAA": "V",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 56,
       "WTAA": "W",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 57,
       "WTAA": "R",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 58,
       "WTAA": "S",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 59,
       "WTAA": "L",
       "MutTo": "all"
     },
     {
-      "chain": "A",
+      "chain": "C",
       "resid": 60,
       "WTAA": "S",
       "MutTo": "all"
@@ -727,248 +727,248 @@
   ],
   "symmetric": [
     [
-      "A1",
+      "C1",
       "B60"
     ],
     [
-      "A2",
+      "C2",
       "B59"
     ],
     [
-      "A3",
+      "C3",
       "B58"
     ],
     [
-      "A4",
+      "C4",
       "B57"
     ],
     [
-      "A5",
+      "C5",
       "B56"
     ],
     [
-      "A6",
+      "C6",
       "B55"
     ],
     [
-      "A7",
+      "C7",
       "B54"
     ],
     [
-      "A8",
+      "C8",
       "B53"
     ],
     [
-      "A9",
+      "C9",
       "B52"
     ],
     [
-      "A10",
+      "C10",
       "B51"
     ],
     [
-      "A11",
+      "C11",
       "B50"
     ],
     [
-      "A12",
+      "C12",
       "B49"
     ],
     [
-      "A13",
+      "C13",
       "B48"
     ],
     [
-      "A14",
+      "C14",
       "B47"
     ],
     [
-      "A15",
+      "C15",
       "B46"
     ],
     [
-      "A16",
+      "C16",
       "B45"
     ],
     [
-      "A17",
+      "C17",
       "B44"
     ],
     [
-      "A18",
+      "C18",
       "B43"
     ],
     [
-      "A19",
+      "C19",
       "B42"
     ],
     [
-      "A20",
+      "C20",
       "B41"
     ],
     [
-      "A21",
+      "C21",
       "B40"
     ],
     [
-      "A22",
+      "C22",
       "B39"
     ],
     [
-      "A23",
+      "C23",
       "B38"
     ],
     [
-      "A24",
+      "C24",
       "B37"
     ],
     [
-      "A25",
+      "C25",
       "B36"
     ],
     [
-      "A26",
+      "C26",
       "B35"
     ],
     [
-      "A27",
+      "C27",
       "B34"
     ],
     [
-      "A28",
+      "C28",
       "B33"
     ],
     [
-      "A29",
+      "C29",
       "B32"
     ],
     [
-      "A30",
+      "C30",
       "B31"
     ],
     [
-      "A31",
+      "C31",
       "B30"
     ],
     [
-      "A32",
+      "C32",
       "B29"
     ],
     [
-      "A33",
+      "C33",
       "B28"
     ],
     [
-      "A34",
+      "C34",
       "B27"
     ],
     [
-      "A35",
+      "C35",
       "B26"
     ],
     [
-      "A36",
+      "C36",
       "B25"
     ],
     [
-      "A37",
+      "C37",
       "B24"
     ],
     [
-      "A38",
+      "C38",
       "B23"
     ],
     [
-      "A39",
+      "C39",
       "B22"
     ],
     [
-      "A40",
+      "C40",
       "B21"
     ],
     [
-      "A41",
+      "C41",
       "B20"
     ],
     [
-      "A42",
+      "C42",
       "B19"
     ],
     [
-      "A43",
+      "C43",
       "B18"
     ],
     [
-      "A44",
+      "C44",
       "B17"
     ],
     [
-      "A45",
+      "C45",
       "B16"
     ],
     [
-      "A46",
+      "C46",
       "B15"
     ],
     [
-      "A47",
+      "C47",
       "B14"
     ],
     [
-      "A48",
+      "C48",
       "B13"
     ],
     [
-      "A49",
+      "C49",
       "B12"
     ],
     [
-      "A50",
+      "C50",
       "B11"
     ],
     [
-      "A51",
+      "C51",
       "B10"
     ],
     [
-      "A52",
+      "C52",
       "B9"
     ],
     [
-      "A53",
+      "C53",
       "B8"
     ],
     [
-      "A54",
+      "C54",
       "B7"
     ],
     [
-      "A55",
+      "C55",
       "B6"
     ],
     [
-      "A56",
+      "C56",
       "B5"
     ],
     [
-      "A57",
+      "C57",
       "B4"
     ],
     [
-      "A58",
+      "C58",
       "B3"
     ],
     [
-      "A59",
+      "C59",
       "B2"
     ],
     [
-      "A60",
+      "C60",
       "B1"
     ]
   ],
   "tied_betas": {
-    "A": 1.0,
+    "C": 1.0,
     "B": 1.0
   },
   "chain_key": {
@@ -976,7 +976,7 @@
       "B": "B"
     },
     "scaffold_14": {
-      "B": "A"
+      "B": "C"
     }
   }
 }
