@@ -48,6 +48,7 @@ class ProteinDesignInputFormatter(object):
         self.AA1 = list('ACDEFGHIKLMNPQRSTVWYX')
         self.AA3_to_AA1 = {aa3: aa1 for aa3, aa1 in zip(self.AA3, self.AA1)}
         
+        # validate we have the correct number of PDBs 
         if not os.path.isdir(pdb_dir):
             raise ValueError(f'The pdb_dir {pdb_dir} is does not exist.')
         else:
@@ -65,6 +66,16 @@ class ProteinDesignInputFormatter(object):
         self.design_default = default_design_setting
         self.bidirectional = bidirectional
         self.multi_state = multi_state
+
+        # validate that all selected options are compatible with each other
+        if self.bidirectional and not self.multi_state:
+            raise ValueError("Cannot enable --bidirectional without enabling --multi_state.")
+        if constraints and not self.multi_state:
+            raise ValueError("Cannot specify --constraints without enabling --multi_state.")
+        if self.multi_state and not constraints:
+            raise ValueError("Cannot enable --multi_state without specifying --constraints.")
+        if constraints and symmetric_res:
+            raise ValueError("Cannot specify both --constraints and --symmetric_res.")
 
         # combine all PDBs into one shared file for MSD
         if self.multi_state:
@@ -645,7 +656,7 @@ def get_arguments() -> argparse.Namespace:
                         default=1000.,
                         type=float,
                         help="Gap (in Angstrom) between states in MSD intermediate structure. "
-                        "Only needed if you hit the PDB overflow limit. Default is 1000.")
+                        "Only may be needed if your structures are very big. Default is 1000.0 A.")
     parser.add_argument('--validation_tries', 
                         default=0, 
                         type=int, 
