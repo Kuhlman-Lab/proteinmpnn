@@ -13,8 +13,9 @@
 
 source ~/.bashrc
 conda activate mpnn
+module load gcc
+module load cuda
 
-
-python ../../../run/generate_json_multi_state.py @json_multi_state.flags
+python ../../../run/generate_json.py @json.flags
 
 python ../../../run/run_protein_mpnn.py @proteinmpnn.flags

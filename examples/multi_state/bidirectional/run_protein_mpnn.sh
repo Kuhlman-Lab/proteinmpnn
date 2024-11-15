@@ -16,6 +16,6 @@ conda activate mpnn
 module load cuda
 module load gcc
 
-python ../../../run/generate_json_multi_state.py @json_multi_state.flags
+python ../../../run/generate_json.py @json.flags
 
 python ../../../run/run_protein_mpnn.py @proteinmpnn.flags
