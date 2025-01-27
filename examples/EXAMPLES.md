@@ -69,11 +69,18 @@ Task: Design proteins to favor and/or disfavor multiple states (structures).
 
 Notes:
 - MSD is currently not supported for symmetric assemblies, since both use the same underlying machinery.
-- All MSD runs require use of a different JSON parsing script (`run/generate_json_multi_state.py`)
 - Each individual state should be saved as a separate PDB file prior to running MSD.
 - MSD will output a FASTA file for each individual state labeled with the PDB prefixes from the input.
+- Residue set args like `--designable_res` require a prefix to specify the state they belong to (e.g., `PDB1:A7-A10`). See examples for details.
 
 #### 3A. Single constraint (`examples/multi_state/single_constraint`)
+
+When specifying residue sets (e.g., using `--designable_res`) in MSD mode, we must specify which state they belong to:
+```
+# Design residues A7-A183 in 4GYT_dimer.pdb and residues A7-A183 in 4GYT_monomer.pdb
+# All states must be in --pdb_dir to be recognized
+--designable_res 4GYT_dimer:A7-A183,B7-B183;4GYT_monomer:A7-A183
+```
 
 We use *constraints* to tie different states together using the following syntax:
 ```
@@ -83,7 +90,7 @@ The above constraint ties together chains A/B of 4GYT_dimer and chain A of 4GYT_
 
 Constraints cannot be used with the `--symmetric_res` argument at this time. Like symmetry, constraints must use residue sets with equal lengths, otherwise an error will be thrown.
 
-Another technical note: multi-state design runs will generate an intermediate output at `msd/msd.pdb` which integrates all the states into a single PDB for compatibility with ProteinMPNN. This means the `--pdb_dir` flag in `proteinmpnn.flags` should be set to `msd/` instead of the default (which is usually `./`). See example files for details.
+Another technical note: multi-state design runs will generate an intermediate output at `msd/msd.pdb` which integrates all the states into a single PDB for compatibility with ProteinMPNN. This means the `--pdb_dir` flag in `proteinmpnn.flags` should be set to `msd/` instead of the default (which is usually `./`).
 
 #### 3B. Mixed or Negative Design (`examples/multi_state/mixed_design`)
 
