@@ -49,7 +49,7 @@ def get_arguments(mpnn_flags_file):
     
     return args
 
-def run_mpnn(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
+def main(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
     
     #pdb_dir, design_specs_json, model_name="v_48_020", backbone_noise=0.00, 
     # num_seq_per_target=1, batch_size=1, sampling_temp="0.1", af2_formatted_output=False, 
@@ -114,7 +114,7 @@ def run_mpnn(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
         outputs = []
         for ix, protein in enumerate(pdb_ds):
             output = []
-            design_specs_dict = json.loads(json_data)
+            design_specs_dict = json_data
             score_list = []
             all_probs_list = []
             all_log_probs_list = []
@@ -239,6 +239,4 @@ def run_mpnn(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
         total_length = X.shape[1]
         print(f'{num_seqs} sequences of length {total_length} generated in {dt} seconds')
 
-    seq = outputs[-1][-1].strip().split("/")
     return seq
-
