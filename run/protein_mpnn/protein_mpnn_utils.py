@@ -7,6 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import itertools
 
+import protein_mpnn.metropolis_sample as metropolis_sample
+
 # A number of functions/classes are adopted from: https://github.com/jingraham/neurips19-graph-protein-design
 
 def _scores(S, log_probs, mask):
@@ -1148,13 +1150,31 @@ class ProteinMPNN(nn.Module):
             prob_chain_list.append(probs[chain_encoding_all == chain_idx])
 
         # prob_chain_list is a list of tensors of length number_of_chains (e.g., 2)
-        # each tensor is a set of probabilities of shape [L, 21] where L is the length of that chain
+        # each tensor is a seti of probabilities of shape [L, 21] where L s the length of that chain
+        out_list1, out_list2, score1, score2, final_AAs1, final_AAs2, DNA_seq1, DNA_seq2 = metropolis_sample.na_sample(prob_chain_list[0], prob_chain_list[1])
 
-        # TODO 2. use these as input to MCMC sampler (Jake)
+        # reshape probabilities to include batch dimension
+        B = X.shape[0]
+        assert B == 1, "Batch size > 1 not tested for MCMC sampling."
+        probs1 = out_list1.expand(B, -1, -1)
+        probs2 = out_list2.expand(B, -1, -1)
+        # concatenate the two strands
+        all_probs = torch.cat([probs1, probs2], dim=1)
 
-        # TODO 3. package output seqs and scores to match expected format for mpnn/evopro (Henry)
-        quit()
-        return                          
+        # reduce one-hot encoding to integer index
+        S = torch.argmax(all_probs, dim=-1)
+
+        # Make placeholder decoding order
+        decoding_order = torch.arange(0, S.shape[1], device=S.device).unsqueeze(0).repeat(S.shape[0], 1)
+
+        # NOTE: to return other scores, just add them to this output dict and parse them later with EvoPro
+        output_dict = {
+            "S": S, 
+            "probs": all_probs, 
+            "decoding_order": decoding_order
+        }
+
+        return output_dict                          
 
     def conditional_probs(self, X, S, mask, chain_M, residue_idx, chain_encoding_all, randn, backbone_only=False):
         """ Graph-conditioned sequence model """

@@ -1,0 +1,4 @@
+--pdb_dir ./
+--designable_res 1:A1-A100;2:A1-A100
+--constraints 1:A1-A60:1,2:A1-A60:1
+--bidirectional

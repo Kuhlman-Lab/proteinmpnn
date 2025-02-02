@@ -1,0 +1,1 @@
+This version uses a Markov Chain Monte Carlo sampling to optimize a pair of proteins via DNA mutations and can be implemented for phase 0, -1 & -2 overlapping proteins. Future updates will come for phase 1 & 2 (same strand). Ensure that the metro.flags file has strand=opposite otherwise it will not work.

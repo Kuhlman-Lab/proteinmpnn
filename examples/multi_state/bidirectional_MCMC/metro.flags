@@ -1,0 +1,8 @@
+strand=opposite
+shift=2
+temperature=0.1
+use_gradient=False
+gradient_start=0.5
+gradient_end=0.05
+num_mutations=30000
+metropolis=False
