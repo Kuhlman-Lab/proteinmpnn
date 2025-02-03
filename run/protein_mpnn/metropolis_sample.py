@@ -210,7 +210,6 @@ def na_sample(probs1, probs2):
     metro_used = 0
     base_set = ['A', 'T', 'C', 'G']
 
-    pos_set = []
     tick = time.time()
     for i in range(num_mutations):
         # only select non-overhanging positions for simplicity
@@ -293,7 +292,7 @@ def na_sample(probs1, probs2):
     print(f'Best Iteration: {best_iter}')
     print(f'Metropolis Used: {metro_used}')
 
-    append_to_csv('mpnn_results.csv', [['Final Score 1', score1.item()], ['Final Score 2', score2.item()], ['Best Iteration', best_iter], ['Metropolis Used', metro_used], ['Runtime', round(elapsed, 0)], ['Final AAs 1', final_AAs1], ['Final AAs 2', final_AAs2], ['Fwd Sequence', fwd_sequence], ['Rev Sequence', rev_sequence[::-1]]])
+    append_to_csv('mpnn_results.csv', [score1.item(), score2.item(), best_iter, metro_used, round(elapsed, 0), final_AAs1, final_AAs2, fwd_sequence, rev_sequence[::-1]])
 
     return out_probs1, out_probs2, score1, score2, final_AAs1, final_AAs2, fwd_sequence, rev_sequence
 
@@ -345,9 +344,20 @@ def append_to_csv(file_path, data):
         writer = csv.writer(file)
         
         if not file_exists:
-            writer.writerow(["Function", "Value"])  # Write headers if file does not exist
+            header = [
+                'Final Score 1', 
+                'Final Score 2', 
+                'Best Iteration',
+                'Metropolis Used', 
+                'Runtime', 
+                'Final AAs 1', 
+                'Final AAs 2', 
+                'Fwd Sequence', 
+                'Rev Sequence',
+            ]
+            writer.writerow(header)  # Write headers if file does not exist
         
-        writer.writerows(data)
+        writer.writerow(data)
 
 def run_metropolis_from_flags(flags_file):
     """
