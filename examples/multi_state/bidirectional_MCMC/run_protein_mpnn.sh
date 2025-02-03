@@ -4,17 +4,15 @@
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH --mem=16g
-#SBATCH -t 00-00:30:00
+#SBATCH -t 00-00:5:00
 #SBATCH --qos gpu_access
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=rhel8
 #SBATCH --mail-type=END
-#SBATCH --mail-user=user@email.com
+#SBATCH --mail-user=jhug@unc.edu
 
 source ~/.bashrc
 conda activate mpnn
-module load gcc
-module load cuda
 
 python ../../../run/generate_json.py @json.flags
 
