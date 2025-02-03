@@ -119,7 +119,7 @@ Ongoing work in the lab involves design of bidirectionally encoded proteins. Thi
 
 To enable bidirectional coding constraints, simply add the flag `--bidirectional` to the `json.flags` file (see `examples/multi_state/bidirectional`). Sequences will be sampled that attempt to maximize favorability across both states, with the added constraint that the two residues chosen must be bidirectionally compatible. Output sequences will be 100% complementary, though the codons may not be optimal for expression.
 
-For greater flexibility in specifying different codon constraints, an experimental MCMC-based method has been developed. To enable this mode, the `--mcmc` flag may be added to `json.flags` (see `examples/multi_state/bidirectional_MCMC`). This setting is currently not validated or recommended for general use.
+For greater flexibility in specifying different codon constraints, an experimental MCMC-based method has been developed. To enable this mode, the `--mcmc` flag may be added to `json.flags` (see `examples/multi_state/bidirectional_MCMC`).
 
 ### 4. Other Protocols
 

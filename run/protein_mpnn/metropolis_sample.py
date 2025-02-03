@@ -166,7 +166,10 @@ def na_sample(probs1, probs2):
     max_score1 = torch.sum(torch.max(probs1, axis=-1))
     max_score2 = torch.sum(torch.max(probs2, axis=-1))
     '''
-    strand, shift, temperature, use_gradient, gradient_start, gradient_end, num_mutations, metropolis = run_metropolis_from_flags('metro.flags')
+    metro_file = os.path.join(os.getcwd(), 'metro.flags')
+    if not os.path.isfile(metro_file):
+        raise ValueError(f"Missing flag file expected at {metro_file}")
+    strand, shift, temperature, use_gradient, gradient_start, gradient_end, num_mutations, metropolis = run_metropolis_from_flags(metro_file)
 
     # Ensure that the two proteins have the same length
     if probs1.shape != probs2.shape:
@@ -356,7 +359,7 @@ def run_metropolis_from_flags(flags_file):
     # Use the arguments to perform your logic
     strand = args.get("strand", 'opposite')
     shift = args.get("shift", 1)
-    temperature = args.get("temperature", 0.1) #Accepts ~5 percent of the sampled data
+    temperature = args.get("temperature", 0.007) #Accepts ~5 percent of the sampled data
     use_gradient = args.get("use_gradient", False)
     gradient_start = args.get("gradient_start", 0.5) #Accepts ~55 percent of the sampled data
     gradient_end = args.get("gradient_end", 0.05) #Accepts ~1 percent of the data
