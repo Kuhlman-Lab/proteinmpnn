@@ -84,20 +84,28 @@ def score(seq1, seq2, probs1, probs2, codons, shift, score_array1, score_array2,
     for n, i in enumerate(codons):
         fwd_codon = seq1[i * 3: i * 3 + 3]
         rev_codon = seq2[i * 3: i * 3 + 3]
-        aa1 = codon_to_amino_acid[fwd_codon]
-        aa2 = codon_to_amino_acid[rev_codon]
+        stop_codon1, stop_codon2 = (aa1_arr ==20), (aa2_arr == 20)
+
+        #score all positions normally except overhang codons don't matter for that strand so we always want to score them as zero
+        try:
+            aa1 = codon_to_amino_acid[fwd_codon]
+            aa1 = 'X' if aa1 == 'Z' else aa1
+            idx1 = amino_acid_position[aa1]
+            aa1_arr[n] = idx1
+            sa1[codons] = torch.where(stop_codon1,torch.tensor(stop_penalty, dtype=torch.float32),-torch.log(probs1[codons, aa1_arr]))
+        except (KeyError, IndexError):
+            pass
+
         # check for rev complements
-        aa1 = 'X' if aa1 == 'Z' else aa1
-        aa2 = 'X' if aa2 == 'Z' else aa2
-        idx1, idx2 = amino_acid_position[aa1], amino_acid_position[aa2]
-        aa1_arr[n] = idx1
-        aa2_arr[n] = idx2
+        try:
+            aa2 = codon_to_amino_acid[rev_codon]
+            aa2 = 'X' if aa2 == 'Z' else aa2
+            idx2 = amino_acid_position[aa2]
+            aa2_arr[n] = idx2
+            sa2[codons] = torch.where(stop_codon2, torch.tensor(stop_penalty, dtype=torch.float32), -torch.log(probs2[codons, aa2_arr]))
+        except (KeyError, IndexError):
+            pass
 
-    stop_codon1, stop_codon2 = (aa1_arr ==20), (aa2_arr == 20) 
-
-    sa1[codons] = torch.where(stop_codon1, torch.tensor(stop_penalty, dtype=torch.float32), -torch.log(probs1[codons, aa1_arr]))
-    sa2[codons] = torch.where(stop_codon2, torch.tensor(stop_penalty, dtype=torch.float32), -torch.log(probs2[codons, aa2_arr]))
-    
     return sa1, sa2
 
 
@@ -179,7 +187,7 @@ def na_sample(probs1, probs2):
     stop_penalty = 10000 # should be as large as possible 
 
     # The number of codons in the pair of proteins
-    num_codons = probs1.shape[0]
+    num_codons = probs1.shape[0] 
     num_nas = num_codons * 3 + shift # +1 for single frame shift, +2 for double frame shift
 
     temp_list = []
@@ -213,7 +221,7 @@ def na_sample(probs1, probs2):
     tick = time.time()
     for i in range(num_mutations):
         # only select non-overhanging positions for simplicity
-        position = np.random.randint(shift, num_nas - shift)
+        position = np.random.randint(0, num_nas)
         char = fwd_sequence[position]
 
         score_arrays1, score_arrays2, sequence_list1, sequence_list2 = sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2, stop_penalty)
