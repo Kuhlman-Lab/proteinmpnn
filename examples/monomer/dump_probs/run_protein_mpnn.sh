@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#SBATCH -p volta-gpu
+#SBATCH -N 1
+#SBATCH -n 1
+#SBATCH --mem=16g
+#SBATCH -t 00-00:30:00
+#SBATCH --qos gpu_access
+#SBATCH --gres=gpu:1
+#SBATCH --constraint=rhel8
+#SBATCH --mail-type=END
+#SBATCH --mail-user=user@email.com
+
+source ~/.bashrc
+conda activate mpnn
+module load cuda
+module load gcc
+
+python ../../../run/generate_json.py @json.flags
+
+python ../../../run/run_protein_mpnn.py @proteinmpnn.flags
+
+python ../../../run/helper_scripts/other_tools/view_probs.py -input outs/6MRR.npz
