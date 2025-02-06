@@ -159,7 +159,7 @@ def run_protein_mpnn(args):
                             scores, scores_per_res = _scores(S_sample, log_probs, mask_for_loss)
                             scores = scores.cpu().data.numpy()
                         
-                        if args.dump: # collect probabilities for each seq
+                        if args.dump_probs: # collect probabilities for each seq
                             probs_list.append(sample_dict["probs"].cpu().data.numpy())
 
 
@@ -306,7 +306,7 @@ def run_protein_mpnn(args):
                                     af2.write(f'{af2_seqs} # {comment}\n')
             
             # Average probs for different decoding runs
-            if args.dump:
+            if args.dump_probs:
                 probs = np.squeeze(np.mean(np.stack(probs_list), axis=0), axis=0)
                 with open(prob_file, 'wb') as pf:
                     np.save(pf, probs)
@@ -498,6 +498,6 @@ if __name__ == "__main__":
     parser.add_argument('--bias_by_res_dict', default=None, type=str, help='Path to json file containing per residue bias dictionary for MPNN. Default is None.')
     parser.add_argument('--pairwise', action='store_true', help='Enables parsing for experimental pairwise mutation clusters (experimental).')
     parser.add_argument('--mcmc', action='store_true', help='If enabled, bidirectional coding uses MCMC routine. Must have --bidirectional flag enabled.')
-    parser.add_argument('--dump', action='store_true', help='If enabled, raw probability tables (L x 20) will be dumped for each sequence.')
+    parser.add_argument('--dump_probs', action='store_true', help='If enabled, predicted sequence probability tables (L x 20) will be dumped for each scaffold. If >1 sequence per scaffold is generated, probs are averaged before saving.')
     args = parser.parse_args()
     run_protein_mpnn(args) 

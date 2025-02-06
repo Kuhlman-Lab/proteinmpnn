@@ -50,7 +50,7 @@ Used in `proteinmpnn.flags`:
 
 `--sampling_temp`: specifies the sampling temperature, which changes how diverse the generated sequences will be. Ranges from 0 to 1, inclusive. A temperature of 0 returns the "best" prediction every time (zero diversity), while a temperature of 1 will return completely random samples. Recommended range is 0.0 - 0.3 or so.
 
-`--dump`: if included, ProteinMPNN will save the raw probability tables for all sequences. This will be a numpy array of shape [L, 21], for a protein of length L. A helper script for visualizing these tables is included at `run/helper_scripts/other_tools/view_probs.py`.
+`--dump_probs`: if included, ProteinMPNN will save the predicted sequence probability table for each scaffold. This will be a numpy array of shape [L, 21], for a protein of length L. If multiple sequences are generated per scaffold, probabilities will be averaged before saving. A helper script for visualizing these tables is included at `run/helper_scripts/other_tools/view_probs.py`.
 
 ### Example Cases
 

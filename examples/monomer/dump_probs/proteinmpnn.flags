@@ -1,4 +1,4 @@
---dump
+--dump_probs
 --pdb_dir ./ # current directory
 --backbone_noise 0.0 # likely doesn't need changing
 --num_seq_per_target 5 # specify how many output sequences per pdb per temp
