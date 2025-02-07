@@ -98,6 +98,7 @@ def run_protein_mpnn(args):
             design_specs_dict = json.loads(design_specs_jsons)
             score_list = []
             S_sample_list = []
+            probs_list = []
             batch_clones = [copy.deepcopy(protein) for i in range(BATCH_COPIES)]
             chain_id_dict, fixed_positions_dict, pssm_dict, omit_AA_dict, bias_AA_dict_decoy, tied_positions_dict, bias_by_res_decoy = transform_inputs(design_specs_dict, protein, experimental=args.experimental)
             X, S, mask, _, chain_M, chain_encoding_all, _, visible_list_list, masked_list_list, masked_chain_length_list_list, chain_M_pos, omit_AA_mask, residue_idx, _, tied_pos_list_of_lists_list, pssm_coef, pssm_bias, pssm_log_odds_all, bias_by_res_all, tied_beta = tied_featurize(batch_clones, device, chain_id_dict, fixed_positions_dict, omit_AA_dict, tied_positions_dict, pssm_dict, bias_by_res_dict)
@@ -116,6 +117,8 @@ def run_protein_mpnn(args):
             # Generate some sequences
             ali_file = os.path.join(output_folder,  batch_clones[0]['name'] + '.fasta')
             af2_file = os.path.join(output_folder, batch_clones[0]['name'] + '.csv')
+            prob_file = os.path.join(output_folder, batch_clones[0]['name'] + '.npz')
+
             # multi-state splitting files
             if 'chain_key' in design_specs_dict:
                 split_ali = [os.path.join(output_folder, fi + '.fasta') for fi in design_specs_dict['chain_key'].keys()]
@@ -156,6 +159,10 @@ def run_protein_mpnn(args):
                             scores, scores_per_res = _scores(S_sample, log_probs, mask_for_loss)
                             scores = scores.cpu().data.numpy()
                         
+                        if args.dump_probs: # collect probabilities for each seq
+                            probs_list.append(sample_dict["probs"].cpu().data.numpy())
+
+
                         S_sample_list.append(S_sample.cpu().data.numpy())
                         for b_ix in range(BATCH_COPIES):
                             masked_chain_length_list = masked_chain_length_list_list[b_ix]
@@ -297,6 +304,13 @@ def run_protein_mpnn(args):
                                     # need to sanitize comment to remove any commas or AF2 parsing will fail
                                     comment = f'T={temp} sample={b_ix} score={score_print} seq_recovery={seq_rec_print}'.replace(',', '')
                                     af2.write(f'{af2_seqs} # {comment}\n')
+            
+            # Average probs for different decoding runs
+            if args.dump_probs:
+                probs = np.squeeze(np.mean(np.stack(probs_list), axis=0), axis=0)
+                with open(prob_file, 'wb') as pf:
+                    np.save(pf, probs)
+
             t1 = time.time()
             dt = round(float(t1-t0), 4)
             num_seqs = len(temperatures)*NUM_BATCHES*BATCH_COPIES
@@ -484,5 +498,6 @@ if __name__ == "__main__":
     parser.add_argument('--bias_by_res_dict', default=None, type=str, help='Path to json file containing per residue bias dictionary for MPNN. Default is None.')
     parser.add_argument('--pairwise', action='store_true', help='Enables parsing for experimental pairwise mutation clusters (experimental).')
     parser.add_argument('--mcmc', action='store_true', help='If enabled, bidirectional coding uses MCMC routine. Must have --bidirectional flag enabled.')
+    parser.add_argument('--dump_probs', action='store_true', help='If enabled, predicted sequence probability tables (L x 20) will be dumped for each scaffold. If >1 sequence per scaffold is generated, probs are averaged before saving.')
     args = parser.parse_args()
     run_protein_mpnn(args) 
