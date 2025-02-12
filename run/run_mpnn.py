@@ -239,4 +239,4 @@ def main(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
         total_length = X.shape[1]
         print(f'{num_seqs} sequences of length {total_length} generated in {dt} seconds')
 
-    return seq
+    return [",".join(seq.split("/"))]
