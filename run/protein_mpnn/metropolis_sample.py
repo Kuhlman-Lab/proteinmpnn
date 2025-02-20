@@ -220,7 +220,7 @@ def na_sample(probs1, probs2):
 
     tick = time.time()
     no_z = False
-    while no_z == False:
+    while not no_z:
         for i in range(num_mutations):
             # only select non-overhanging positions for simplicity
             position = np.random.randint(0, num_nas)
@@ -268,10 +268,6 @@ def na_sample(probs1, probs2):
                         score_array1, score_array2 = score_arrays1[random_min], score_arrays2[random_min]
                         metro_used += 1
 
-            #Reset our temperary score arrays to the best scoring arrays
-            new_score_array1A, new_score_array1T, new_score_array1C, new_score_array1G = score_array1, score_array1, score_array1, score_array1
-            new_score_array2A, new_score_array2T, new_score_array2C, new_score_array2G = score_array2, score_array2, score_array2, score_array2
-
         # Format sequence into final (transcribed) format
         final_AAs1, final_AAs2 = BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift)
         final_AAs1 = ''.join(final_AAs1)
@@ -280,7 +276,6 @@ def na_sample(probs1, probs2):
         pos = 0
         out_probs1 = torch.zeros_like(probs1, device='cuda')
         for char in final_AAs1:
-            # NOTE: how to handle stop codon?
             char = "X" if char == "Z" else char
             out_probs1[pos, amino_acid_position[char]] = 1
             pos += 1
@@ -288,14 +283,12 @@ def na_sample(probs1, probs2):
         out_probs2 = torch.zeros_like(probs2, device='cuda')
         pos = 0
         for char in final_AAs2:
-            # NOTE: how to handle stop codon?
             char = "X" if char == "Z" else char
             out_probs2[pos, amino_acid_position[char]] = 1
             pos += 1
 
         # Check if there are any stop codons in the final sequence
-        if 'Z' not in final_AAs1 or 'Z' not in final_AAs2:
-            no_z = True
+        no_z = ('Z' not in final_AAs1) and ('Z' not in final_AAs2)
 
 
     elapsed = time.time() - tick
