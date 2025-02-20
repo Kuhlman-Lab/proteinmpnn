@@ -219,77 +219,77 @@ def na_sample(probs1, probs2):
     base_set = ['A', 'T', 'C', 'G']
 
     tick = time.time()
-    for i in range(num_mutations):
-        # only select non-overhanging positions for simplicity
-        position = np.random.randint(0, num_nas)
-        char = fwd_sequence[position]
+    no_z = False
+    while not no_z:
+        for i in range(num_mutations):
+            # only select non-overhanging positions for simplicity
+            position = np.random.randint(0, num_nas)
+            char = fwd_sequence[position]
 
-        score_arrays1, score_arrays2, sequence_list1, sequence_list2 = sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2, stop_penalty)
+            score_arrays1, score_arrays2, sequence_list1, sequence_list2 = sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2, stop_penalty)
 
-        # Compute combined scores with each given mutation set
-        scores1 = torch.tensor([torch.sum(arr) for arr in score_arrays1])
-        scores2 = torch.tensor([torch.sum(arr) for arr in score_arrays2])
-        combined_scores = scores1 * scores2
-        
-        # Get the indices of the minimum values. After 1000 iterations, disallow accepting the same sequence
-        if i > 1000:
-            combined_scores[base_set.index(char)] = torch.tensor(float('inf'))
+            # Compute combined scores with each given mutation set
+            scores1 = torch.tensor([torch.sum(arr) for arr in score_arrays1])
+            scores2 = torch.tensor([torch.sum(arr) for arr in score_arrays2])
+            combined_scores = scores1 * scores2
+            
+            # Get the indices of the minimum values. After 1000 iterations, disallow accepting the same sequence
+            if i > 1000:
+                combined_scores[base_set.index(char)] = torch.tensor(float('inf'))
 
-        min_indices = torch.nonzero(combined_scores == combined_scores.min()).squeeze()
+            min_indices = torch.nonzero(combined_scores == combined_scores.min()).squeeze()
 
-        # If there are multiple indices with the same minimum value, randomly choose one. 
-        if min_indices.dim() > 0:  # If there are multiple indices
-            random_min = min_indices[torch.randint(0, len(min_indices), (1,))]
-        else:  # If there's only one index
-            random_min = min_indices
+            # If there are multiple indices with the same minimum value, randomly choose one. 
+            if min_indices.dim() > 0:  # If there are multiple indices
+                random_min = min_indices[torch.randint(0, len(min_indices), (1,))]
+            else:  # If there's only one index
+                random_min = min_indices
 
-        # Determine if we should accept the new sequence
-        if combined_scores[random_min] < score_overall:
-                new_score = combined_scores[random_min]
-                fwd_sequence, rev_sequence = sequence_list1[random_min], sequence_list2[random_min]
-                score1, score2 = scores1[random_min], scores2[random_min]
-                score_overall = new_score
-                score_array1, score_array2 = score_arrays1[random_min], score_arrays2[random_min]
-                best_iter = i
-        
-        # If new score is worse we randomly sample a number and use the Metropolis Algorithm to determine if we should accept the new sequence
-        elif metropolis:
-                metro_rand = np.random.rand()
-                energy = ((combined_scores[random_min]) - score_overall)/score_overall
-                energy = energy.detach().cpu().numpy()
-                metro_score = 1 - np.exp(-energy/temp_list[i]) #metropolis energy = e^(-E/T)
-                new_score = combined_scores[random_min]
-                if metro_score < metro_rand:
+            # Determine if we should accept the new sequence
+            if combined_scores[random_min] < score_overall:
+                    new_score = combined_scores[random_min]
                     fwd_sequence, rev_sequence = sequence_list1[random_min], sequence_list2[random_min]
                     score1, score2 = scores1[random_min], scores2[random_min]
                     score_overall = new_score
                     score_array1, score_array2 = score_arrays1[random_min], score_arrays2[random_min]
-                    metro_used += 1
+                    best_iter = i
+            
+            # If new score is worse we randomly sample a number and use the Metropolis Algorithm to determine if we should accept the new sequence
+            elif metropolis:
+                    metro_rand = np.random.rand()
+                    energy = ((combined_scores[random_min]) - score_overall)/score_overall
+                    energy = energy.detach().cpu().numpy()
+                    metro_score = 1 - np.exp(-energy/temp_list[i]) #metropolis energy = e^(-E/T)
+                    new_score = combined_scores[random_min]
+                    if metro_score < metro_rand:
+                        fwd_sequence, rev_sequence = sequence_list1[random_min], sequence_list2[random_min]
+                        score1, score2 = scores1[random_min], scores2[random_min]
+                        score_overall = new_score
+                        score_array1, score_array2 = score_arrays1[random_min], score_arrays2[random_min]
+                        metro_used += 1
 
-        #Reset our temperary score arrays to the best scoring arrays
-        new_score_array1A, new_score_array1T, new_score_array1C, new_score_array1G = score_array1, score_array1, score_array1, score_array1
-        new_score_array2A, new_score_array2T, new_score_array2C, new_score_array2G = score_array2, score_array2, score_array2, score_array2
+        # Format sequence into final (transcribed) format
+        final_AAs1, final_AAs2 = BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift)
+        final_AAs1 = ''.join(final_AAs1)
+        final_AAs2 = ''.join(final_AAs2)
 
-    # Format sequence into final (transcribed) format
-    final_AAs1, final_AAs2 = BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift)
-    final_AAs1 = ''.join(final_AAs1)
-    final_AAs2 = ''.join(final_AAs2)
+        pos = 0
+        out_probs1 = torch.zeros_like(probs1, device='cuda')
+        for char in final_AAs1:
+            char = "X" if char == "Z" else char
+            out_probs1[pos, amino_acid_position[char]] = 1
+            pos += 1
 
-    pos = 0
-    out_probs1 = torch.zeros_like(probs1, device='cuda')
-    for char in final_AAs1:
-        # NOTE: how to handle stop codon?
-        char = "X" if char == "Z" else char
-        out_probs1[pos, amino_acid_position[char]] = 1
-        pos += 1
+        out_probs2 = torch.zeros_like(probs2, device='cuda')
+        pos = 0
+        for char in final_AAs2:
+            char = "X" if char == "Z" else char
+            out_probs2[pos, amino_acid_position[char]] = 1
+            pos += 1
 
-    out_probs2 = torch.zeros_like(probs2, device='cuda')
-    pos = 0
-    for char in final_AAs2:
-        # NOTE: how to handle stop codon?
-        char = "X" if char == "Z" else char
-        out_probs2[pos, amino_acid_position[char]] = 1
-        pos += 1
+        # Check if there are any stop codons in the final sequence
+        no_z = ('Z' not in final_AAs1) and ('Z' not in final_AAs2)
+
 
     elapsed = time.time() - tick
     print(f'Final Scores: {score1}, {score2}')
@@ -373,7 +373,7 @@ def run_metropolis_from_flags(flags_file):
     :param flags_file: Path to the flags file.
     """
     args = load_flags(flags_file)
-    print(f"Loaded arguments: {args}")
+    #print(f"Loaded arguments: {args}")
     # Use the arguments to perform your logic
     strand = args.get("strand", 'opposite')
     shift = args.get("shift", 1)
