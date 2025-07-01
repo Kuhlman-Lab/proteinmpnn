@@ -16,6 +16,21 @@ cd proteinmpnn
 mamba create env -f setup/proteinmpnn.yml
 ```
 
+### NOTE (July 2025):
+
+ProteinMPNN uses CUDA 11.3, which is too old for the new H100 GPUs (CUDA 11.8+). This means it may hang if run from the default ```mpnn``` environment.
+
+To fix this, we can generate a CUDA 12.4 environment as follows:
+```
+# Install original env without torch/cuda dependencies
+mamba env create -f setup/proteinmpnn_cu2.4.yml -n mpnn_cu12.4
+
+# Install torch/cuda 12.4 dependencies
+pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
+```
+
+To use this, simply replace ```conda activate mpnn``` with ```conda activate mpnn_cu2.4``` wherever present.
+
 ## Usage Guidelines:
 
 ### General Usage
