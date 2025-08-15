@@ -100,7 +100,7 @@ def main(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
             if AA in list(args.bias_AA_dict.keys()):
                 bias_AAs_np[n] = args.bias_AA_dict[AA]
 
-    ckpt = torch.load(ckpt_path, map_location=device)
+    ckpt = torch.load(ckpt_path, map_location=device, weights_only=True)
     num_edges = ckpt['num_edges']
     model = ProteinMPNN(num_letters=21, node_features=hidden_dim, edge_features=hidden_dim, hidden_dim=hidden_dim,
                         num_encoder_layers=num_layers, num_decoder_layers=num_layers, augment_eps=args.backbone_noise,
@@ -163,6 +163,8 @@ def main(mpnn_flags_file, design_run=True, json_data=None, pdb_paths=None):
                                                    pssm_log_odds_flag=bool(pssm_log_odds_flag), 
                                                    pssm_log_odds_mask=pssm_log_odds_mask, 
                                                    pssm_bias_flag=bool(pssm_bias_flag), bias_by_res=bias_by_res_all)
+                    elif args.mcmc: # MCMC based bidirectional sampling
+                        sample_dict = model.mcmc_sample(X, mask, residue_idx, chain_encoding_all, temperature=temp)        
                     else:
                         sample_dict = model.tied_sample(X, randn_2, S, chain_M, chain_encoding_all, residue_idx, mask=mask, 
                                                         temperature=temp, omit_AAs_np=omit_AAs_np, bias_AAs_np=bias_AAs_np, 
