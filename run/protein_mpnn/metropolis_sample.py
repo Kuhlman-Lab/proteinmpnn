@@ -4,6 +4,9 @@ import time
 import csv
 import os
 
+# Change mutation function to disallow stop codons from ever being chosen
+# Add a function to remove stop codons if they are present after a full round of sampling
+
 
 def BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift):
     aa_list1, aa_list2 = [], []
@@ -84,29 +87,69 @@ def score(seq1, seq2, probs1, probs2, codons, shift, score_array1, score_array2,
     for n, i in enumerate(codons):
         fwd_codon = seq1[i * 3: i * 3 + 3]
         rev_codon = seq2[i * 3: i * 3 + 3]
-        stop_codon1, stop_codon2 = (aa1_arr ==20), (aa2_arr == 20)
 
         #score all positions normally except overhang codons don't matter for that strand so we always want to score them as zero
         try:
             aa1 = codon_to_amino_acid[fwd_codon]
-            aa1 = 'X' if aa1 == 'Z' else aa1
-            idx1 = amino_acid_position[aa1]
-            aa1_arr[n] = idx1
-            sa1[codons] = torch.where(stop_codon1,torch.tensor(stop_penalty, dtype=torch.float32),-torch.log(probs1[codons, aa1_arr]))
+            if aa1 == 'Z':  # If it's a stop codon, assign maximum penalty
+                sa1[i] = torch.tensor(float('inf'), dtype=torch.float32)
+            else:
+                aa1 = 'X' if aa1 == 'Z' else aa1  # This line is now redundant but kept for safety
+                idx1 = amino_acid_position[aa1]
+                aa1_arr[n] = idx1
+                sa1[i] = -torch.log(probs1[i, idx1])
         except (KeyError, IndexError):
             pass
 
         # check for rev complements
         try:
             aa2 = codon_to_amino_acid[rev_codon]
-            aa2 = 'X' if aa2 == 'Z' else aa2
-            idx2 = amino_acid_position[aa2]
-            aa2_arr[n] = idx2
-            sa2[codons] = torch.where(stop_codon2, torch.tensor(stop_penalty, dtype=torch.float32), -torch.log(probs2[codons, aa2_arr]))
+            if aa2 == 'Z':  # If it's a stop codon, assign maximum penalty
+                sa2[i] = torch.tensor(float('inf'), dtype=torch.float32)
+            else:
+                aa2 = 'X' if aa2 == 'Z' else aa2  # This line is now redundant but kept for safety
+                idx2 = amino_acid_position[aa2]
+                aa2_arr[n] = idx2
+                sa2[i] = -torch.log(probs2[i, idx2])
         except (KeyError, IndexError):
             pass
 
     return sa1, sa2
+
+def find_zs(fwd_sequence, rev_sequence, num_codons):
+    aa_list1, aa_list2, fwd_zs, rev_zs = [], [], [], []
+    for i in range(num_codons):
+        fwd_codon = fwd_sequence[i * 3: i * 3 + 3]
+        rev_codon = rev_sequence[i * 3: i * 3 + 3]
+        aa_list1 += codon_to_amino_acid[fwd_codon]
+        aa_list2 += codon_to_amino_acid[rev_codon]
+        if codon_to_amino_acid[fwd_codon] == 'Z':
+            fwd_zs.append(i)
+        if codon_to_amino_acid[rev_codon] == 'Z':
+            rev_zs.append(i)
+    return fwd_zs, rev_zs, aa_list1, aa_list2
+    
+'''
+def z_mutator(fwd_sequence, rev_sequence, num_codons, shift):
+    """
+    Removes stop codons from the sequences and returns the modified sequences without caring about scores.
+    Useful to prevent the algorithm from getting stuck in a local minimum with stop codons.
+    """
+    fwd_zs, rev_zs, aa_list1, aa_list2  = find_zs(fwd_sequence, rev_sequence, num_codons)
+    zs_exist = len(fwd_zs) > 0 or len(rev_zs) > 0
+    while zs_exist:
+        for i in fwd_zs:
+            fwd_sequence = fwd_sequence[:i * 3] + 'C' + fwd_sequence[i * 3 + 1:]
+            rev_sequence = rev_sequence[:len(rev_sequence) - i * 3] + 'G' + rev_sequence[len(rev_sequence) - i * 3 + 1:]
+        for i in rev_zs:
+            rev_sequence = rev_sequence[:i * 3] + 'C' + rev_sequence[i * 3 + 1:]
+            fwd_sequence = fwd_sequence[:len(fwd_sequence) - i * 3] + 'G' + fwd_sequence[len(fwd_sequence) - i * 3 + 1:]
+        fwd_zs, rev_zs, aa_list1, aa_list2 = find_zs(fwd_sequence, rev_sequence, num_codons)
+        zs_exist = len(fwd_zs) > 0 or len(rev_zs) > 0
+    # If we removed all stop codons, return the modified sequences
+
+    return fwd_sequence, rev_sequence
+'''
 
 
 # Define Dictionary of Amino Acids
@@ -196,14 +239,21 @@ def na_sample(probs1, probs2):
     else:
         temp_list = [temperature] * num_mutations
 
+    '''
     # Create a random DNA sequence for testing
     fwd_sequence = ''
     for NA in range(num_nas):
         fwd_sequence += np.random.choice(['A', 'T', 'C', 'G'])
+    
     # Create the reverse complement of the DNA sequence
     rev_sequence = ''
     for BP in fwd_sequence[::-1]:
         rev_sequence += nucleic_acid_complement[BP]
+    '''
+    
+    # Create an all A DNA sequence for testing
+    fwd_sequence = 'A' * num_nas
+    rev_sequence = 'T' * num_nas
 
     # Do initial scoring for baseline values
     probs1, probs2 = probs1.to('cpu'), probs2.to('cpu')
@@ -220,6 +270,7 @@ def na_sample(probs1, probs2):
 
     tick = time.time()
     no_z = False
+    rounds = 0
     while not no_z:
         for i in range(num_mutations):
             # only select non-overhanging positions for simplicity
@@ -267,6 +318,8 @@ def na_sample(probs1, probs2):
                         score_overall = new_score
                         score_array1, score_array2 = score_arrays1[random_min], score_arrays2[random_min]
                         metro_used += 1
+            if torch.isinf(score1) or torch.isinf(score2):
+                print('A sequence has a stop codon during iter {i}')
 
         # Format sequence into final (transcribed) format
         final_AAs1, final_AAs2 = BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift)
@@ -289,9 +342,23 @@ def na_sample(probs1, probs2):
 
         # Check if there are any stop codons in the final sequence
         no_z = ('Z' not in final_AAs1) and ('Z' not in final_AAs2)
+        '''
+        if rounds >5 and not no_z:
+            print(f'Stop codons found. Removing Zs from sequences: {final_AAs1}, {final_AAs2}')
+            no_z = True
+            fwd_sequence, rev_sequence = z_mutator(fwd_sequence, rev_sequence, num_codons, shift)
+            score_array1, score_array2 = score(fwd_sequence, rev_sequence, probs1, probs2, codons, shift, init1, init2, stop_penalty)
+            score_overall = (score1 * score2)
+            final_AAs1, final_AAs2 = BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift)
+            final_AAs1 = ''.join(final_AAs1)
+            final_AAs2 = ''.join(final_AAs2)
+        '''
+        rounds += 1
+
 
 
     elapsed = time.time() - tick
+    print(f'Finished after {rounds} rounds:')
     print(f'Final Scores: {score1}, {score2}')
     print(f'Final AAs: {final_AAs1}, {final_AAs2}')
     print(f'Fwd Sequence (5p to 3p): {fwd_sequence}')
