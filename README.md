@@ -23,7 +23,7 @@ ProteinMPNN uses CUDA 11.3, which is too old for the new H100 GPUs (CUDA 11.8+).
 To fix this, we can generate a CUDA 12.4 environment as follows:
 ```
 # Install original env without torch/cuda dependencies
-mamba env create -f setup/proteinmpnn_cu2.4.yml -n mpnn_cu12.4
+mamba env create -f setup/proteinmpnn_cu12.4.yml -n mpnn_cu12.4
 
 # Install torch/cuda 12.4 dependencies
 pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu124
