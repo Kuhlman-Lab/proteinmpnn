@@ -1,0 +1,5 @@
+--pdb_dir ./
+--cluster_center A1,B1
+--cluster_radius 10.0
+--symmetric_res A1-A391:B1-B391
+
