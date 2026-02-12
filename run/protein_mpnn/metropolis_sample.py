@@ -4,9 +4,6 @@ import time
 import csv
 import os
 
-# Change mutation function to disallow stop codons from ever being chosen
-# Add a function to remove stop codons if they are present after a full round of sampling
-
 
 def BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift):
     aa_list1, aa_list2 = [], []
@@ -144,65 +141,10 @@ def score_all_codons(seq1, seq2, probs1, probs2):
 
     return score_array1, score_array2
 
-'''
-def score(seq1, seq2, probs1, probs2, codons, score_array1, score_array2):
-    """
-    seq1 = string representation of seq 1 of length L
-    seq2 = string representation of seq 2 of length L
-
-    probs1 = raw logits for seq 1 of shape [L, 21]
-    probs2 = raw logits for seq 1 of shape [L, 21], flipped along L axis
-
-    codons = tensor of codon indices to score and replace
-    shift = how many base pairs to shift when retrieving AA from codon
-
-    score_array1 = tensor of previous score1 of shape [L]
-    score_array2 = tensor of previous score2 of shape [L]
-    """
-    sa1 = score_array1.clone()
-    sa2 = score_array2.clone()
-
-    # Fill in arrays of [L, ] score values in quick loop
-    num_codons = codons.numel()
-    aa1_arr, aa2_arr = torch.zeros(num_codons, device='cpu', dtype=torch.long), torch.zeros(num_codons, device='cpu', dtype=torch.long)
-    for n, i in enumerate(codons):
-        fwd_codon = seq1[i * 3: i * 3 + 3]
-        rev_codon = seq2[i * 3: i * 3 + 3]
-
-        #score all positions normally except overhang codons don't matter for that strand so we always want to score them as zero
-        try:
-            aa1 = codon_to_amino_acid[fwd_codon]
-            if aa1 == 'Z':  # If it's a stop codon, assign maximum penalty
-                sa1[i] = torch.tensor(float('inf'), dtype=torch.float32)
-            else:
-                aa1 = 'X' if aa1 == 'Z' else aa1  # This line is now redundant but kept for safety
-                idx1 = amino_acid_position[aa1]
-                aa1_arr[n] = idx1
-                sa1[i] = -torch.log(probs1[i, idx1])
-        except (KeyError, IndexError):
-            pass
-
-        # check for rev complements
-        try:
-            aa2 = codon_to_amino_acid[rev_codon]
-            if aa2 == 'Z':  # If it's a stop codon, assign maximum penalty
-                sa2[i] = torch.tensor(float('inf'), dtype=torch.float32)
-            else:
-                aa2 = 'X' if aa2 == 'Z' else aa2  # This line is now redundant but kept for safety
-                idx2 = amino_acid_position[aa2]
-                aa2_arr[n] = idx2
-                sa2[i] = -torch.log(probs2[i, idx2])
-        except (KeyError, IndexError):
-            pass
-
-    return sa1, sa2
-'''
-
 
 def score(seq1, seq2, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2, debug=False):
     sa1 = score_array1.clone()
     sa2 = score_array2.clone()
-    num_codons = len(score_array1)
 
     # --- Forward codon ---
     try:
@@ -212,7 +154,6 @@ def score(seq1, seq2, probs1, probs2, fwd_idx, rev_idx, score_array1, score_arra
         aa1 = codon_to_amino_acid[fwd_codon]
         sa1[fwd_idx] = float('inf') if aa1 == 'Z' else -torch.log(probs1[fwd_idx, amino_acid_position[aa1]])
     except (KeyError, IndexError):
-        #print(f"Error scoring codons at indices fwd_idx={fwd_idx}, rev_idx={rev_idx}. Check if the sequences are properly formatted and the indices are within bounds.")
         pass
 
     # --- Reverse codon ---
@@ -223,7 +164,6 @@ def score(seq1, seq2, probs1, probs2, fwd_idx, rev_idx, score_array1, score_arra
         aa2 = codon_to_amino_acid[rev_codon]
         sa2[rev_idx] = float('inf') if aa2 == 'Z' else -torch.log(probs2[rev_idx, amino_acid_position[aa2]])
     except (KeyError, IndexError):
-        #print(f"Error scoring codons at indices fwd_idx={fwd_idx}, rev_idx={rev_idx}. Check if the sequences are properly formatted and the indices are within bounds.")
         pass
 
     if debug:
@@ -232,28 +172,6 @@ def score(seq1, seq2, probs1, probs2, fwd_idx, rev_idx, score_array1, score_arra
 
     return sa1, sa2
     
-'''
-def z_mutator(fwd_sequence, rev_sequence, num_codons, shift):
-    """
-    Removes stop codons from the sequences and returns the modified sequences without caring about scores.
-    Useful to prevent the algorithm from getting stuck in a local minimum with stop codons.
-    """
-    fwd_zs, rev_zs, aa_list1, aa_list2  = find_zs(fwd_sequence, rev_sequence, num_codons)
-    zs_exist = len(fwd_zs) > 0 or len(rev_zs) > 0
-    while zs_exist:
-        for i in fwd_zs:
-            fwd_sequence = fwd_sequence[:i * 3] + 'C' + fwd_sequence[i * 3 + 1:]
-            rev_sequence = rev_sequence[:len(rev_sequence) - i * 3] + 'G' + rev_sequence[len(rev_sequence) - i * 3 + 1:]
-        for i in rev_zs:
-            rev_sequence = rev_sequence[:i * 3] + 'C' + rev_sequence[i * 3 + 1:]
-            fwd_sequence = fwd_sequence[:len(fwd_sequence) - i * 3] + 'G' + fwd_sequence[len(fwd_sequence) - i * 3 + 1:]
-        fwd_zs, rev_zs, aa_list1, aa_list2 = find_zs(fwd_sequence, rev_sequence, num_codons)
-        zs_exist = len(fwd_zs) > 0 or len(rev_zs) > 0
-    # If we removed all stop codons, return the modified sequences
-
-    return fwd_sequence, rev_sequence
-'''
-
 
 # Define Dictionary of Amino Acids
 codon_to_amino_acid = {
