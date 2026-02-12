@@ -9,7 +9,7 @@
 #SBATCH --gres=gpu:1
 
 source ~/.bashrc
-conda activate mpnn_cu2.4
+conda activate mpnn_cu12.4
 
 python ../../../run/generate_json.py @json.flags
 
