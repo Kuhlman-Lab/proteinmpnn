@@ -4,9 +4,6 @@ import time
 import csv
 import os
 
-# Change mutation function to disallow stop codons from ever being chosen
-# Add a function to remove stop codons if they are present after a full round of sampling
-
 
 def BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift):
     aa_list1, aa_list2 = [], []
@@ -20,14 +17,14 @@ def BPs_to_AAs(fwd_sequence, rev_sequence, num_codons, shift):
     aa_list2 = ''.join(aa_list2)
     return aa_list1, aa_list2
 
-def sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2, stop_penalty):
+def sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2):
     """
     position = position to sample
     fwd_sequence = string representation of seq 1 of length L
     rev_sequence = string representation of seq 2 of length L
 
     probs1 = raw logits for seq 1 of shape [L, 21]
-    probs2 = raw logits for seq 1 of shape [L, 21], flipped along L axis
+    probs2 = raw logits for seq 1 of shape [L, 21]
 
     codons = tensor of codon indices to score and replace
     shift = how many base pairs to shift when retrieving AA from codon
@@ -49,11 +46,12 @@ def sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, pro
     new_rev_sequenceG = rev_sequence[:rev_position] + 'C' + rev_sequence[rev_position + 1:]
 
     # convert from bp index to codon index and scores the new sequences
-    codons = torch.tensor([position // 3, (rev_position) // 3], device='cpu')
-    new_score_array1A, new_score_array2A = score(new_fwd_sequenceA, new_rev_sequenceA, probs1, probs2, codons, shift, score_array1, score_array2, stop_penalty)
-    new_score_array1T, new_score_array2T = score(new_fwd_sequenceT, new_rev_sequenceT, probs1, probs2, codons, shift, score_array1, score_array2, stop_penalty)
-    new_score_array1C, new_score_array2C = score(new_fwd_sequenceC, new_rev_sequenceC, probs1, probs2, codons, shift, score_array1, score_array2, stop_penalty)
-    new_score_array1G, new_score_array2G = score(new_fwd_sequenceG, new_rev_sequenceG, probs1, probs2, codons, shift, score_array1, score_array2, stop_penalty)
+    fwd_idx = position // 3
+    rev_idx = (rev_position) // 3
+    new_score_array1A, new_score_array2A = score(new_fwd_sequenceA, new_rev_sequenceA, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+    new_score_array1T, new_score_array2T = score(new_fwd_sequenceT, new_rev_sequenceT, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+    new_score_array1C, new_score_array2C = score(new_fwd_sequenceC, new_rev_sequenceC, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+    new_score_array1G, new_score_array2G = score(new_fwd_sequenceG, new_rev_sequenceG, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
 
     # Create lists of score arrays and sequences for min calculations and indexing
     score_arrays1 = [new_score_array1A, new_score_array1T, new_score_array1C, new_score_array1G]
@@ -64,10 +62,11 @@ def sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, pro
 
     return score_arrays1, score_arrays2, sequence_list1, sequence_list2
 
-def score(seq1, seq2, probs1, probs2, codons, shift, score_array1, score_array2, stop_penalty):
+def sample_all_same_strand(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2):
     """
-    seq1 = string representation of seq 1 of length L
-    seq2 = string representation of seq 2 of length L
+    position = position to sample
+    fwd_sequence = string representation of seq 1 of length L
+    rev_sequence = string representation of seq 2 of length L
 
     probs1 = raw logits for seq 1 of shape [L, 21]
     probs2 = raw logits for seq 1 of shape [L, 21], flipped along L axis
@@ -78,79 +77,101 @@ def score(seq1, seq2, probs1, probs2, codons, shift, score_array1, score_array2,
     score_array1 = tensor of previous score1 of shape [L]
     score_array2 = tensor of previous score2 of shape [L]
     """
+
+    new_fwd_sequenceA = fwd_sequence[:position] + 'A' + fwd_sequence[position + 1:]
+    new_fwd_sequenceT = fwd_sequence[:position] + 'T' + fwd_sequence[position + 1:]
+    new_fwd_sequenceC = fwd_sequence[:position] + 'C' + fwd_sequence[position + 1:]
+    new_fwd_sequenceG = fwd_sequence[:position] + 'G' + fwd_sequence[position + 1:]
+
+    # Calculates the reverse compliment position and generates the corresponding sequences
+    new_rev_sequenceA = fwd_sequence[shift:position] + 'A' + fwd_sequence[position + 1:] + fwd_sequence[-shift:]
+    new_rev_sequenceT = fwd_sequence[shift:position] + 'T' + fwd_sequence[position + 1:] + fwd_sequence[-shift:]
+    new_rev_sequenceC = fwd_sequence[shift:position] + 'C' + fwd_sequence[position + 1:] + fwd_sequence[-shift:]
+    new_rev_sequenceG = fwd_sequence[shift:position] + 'G' + fwd_sequence[position + 1:] + fwd_sequence[-shift:]
+
+    # convert from bp index to codon index and scores the new sequences
+    fwd_idx = position // 3
+    rev_idx = (num_nas - position - 1) // 3
+    new_score_array1A, new_score_array2A = score(new_fwd_sequenceA, new_rev_sequenceA, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+    new_score_array1T, new_score_array2T = score(new_fwd_sequenceT, new_rev_sequenceT, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+    new_score_array1C, new_score_array2C = score(new_fwd_sequenceC, new_rev_sequenceC, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+    new_score_array1G, new_score_array2G = score(new_fwd_sequenceG, new_rev_sequenceG, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2)
+
+    # Create lists of score arrays and sequences for min calculations and indexing
+    score_arrays1 = [new_score_array1A, new_score_array1T, new_score_array1C, new_score_array1G]
+    score_arrays2 = [new_score_array2A, new_score_array2T, new_score_array2C, new_score_array2G]
+
+    sequence_list1 = [new_fwd_sequenceA, new_fwd_sequenceT, new_fwd_sequenceC, new_fwd_sequenceG]
+    sequence_list2 = [new_rev_sequenceA, new_rev_sequenceT, new_rev_sequenceC, new_rev_sequenceG]
+
+    return score_arrays1, score_arrays2, sequence_list1, sequence_list2
+
+def score_all_codons(seq1, seq2, probs1, probs2):
+    """
+    Score every codon in the sequences.
+    Returns two score arrays of shape [num_codons]
+    """
+    num_codons = probs1.shape[0]
+    score_array1 = torch.zeros(num_codons, device='cpu')
+    score_array2 = torch.zeros(num_codons, device='cpu')
+
+    for i in range(num_codons):
+        fwd_codon = seq1[i*3 : i*3+3]
+        rev_codon = seq2[i*3 : i*3+3]
+
+        # Forward codon
+        try:
+            aa1 = codon_to_amino_acid[fwd_codon]
+            if aa1 == 'Z':
+                score_array1[i] = float('inf')
+            else:
+                score_array1[i] = -torch.log(probs1[i, amino_acid_position[aa1]])
+        except (KeyError, IndexError):
+            score_array1[i] = 0.0
+
+        # Reverse codon
+        try:
+            aa2 = codon_to_amino_acid[rev_codon]
+            if aa2 == 'Z':
+                score_array2[i] = float('inf')
+            else:
+                score_array2[i] = -torch.log(probs2[i, amino_acid_position[aa2]])
+        except (KeyError, IndexError):
+            score_array2[i] = 0.0
+
+    return score_array1, score_array2
+
+
+def score(seq1, seq2, probs1, probs2, fwd_idx, rev_idx, score_array1, score_array2, debug=False):
     sa1 = score_array1.clone()
     sa2 = score_array2.clone()
 
-    # Fill in arrays of [L, ] score values in quick loop
-    num_codons = codons.numel()
-    aa1_arr, aa2_arr = torch.zeros(num_codons, device='cpu', dtype=torch.long), torch.zeros(num_codons, device='cpu', dtype=torch.long)
-    for n, i in enumerate(codons):
-        fwd_codon = seq1[i * 3: i * 3 + 3]
-        rev_codon = seq2[i * 3: i * 3 + 3]
+    # --- Forward codon ---
+    try:
+        fwd_codon = seq1[fwd_idx*3 : fwd_idx*3+3]
+        if len(fwd_codon) < 3:
+            raise IndexError
+        aa1 = codon_to_amino_acid[fwd_codon]
+        sa1[fwd_idx] = float('inf') if aa1 == 'Z' else -torch.log(probs1[fwd_idx, amino_acid_position[aa1]])
+    except (KeyError, IndexError):
+        pass
 
-        #score all positions normally except overhang codons don't matter for that strand so we always want to score them as zero
-        try:
-            aa1 = codon_to_amino_acid[fwd_codon]
-            if aa1 == 'Z':  # If it's a stop codon, assign maximum penalty
-                sa1[i] = torch.tensor(float('inf'), dtype=torch.float32)
-            else:
-                aa1 = 'X' if aa1 == 'Z' else aa1  # This line is now redundant but kept for safety
-                idx1 = amino_acid_position[aa1]
-                aa1_arr[n] = idx1
-                sa1[i] = -torch.log(probs1[i, idx1])
-        except (KeyError, IndexError):
-            pass
+    # --- Reverse codon ---
+    try:
+        rev_codon = seq2[rev_idx*3 : rev_idx*3+3]
+        if len(rev_codon) < 3:
+            raise IndexError
+        aa2 = codon_to_amino_acid[rev_codon]
+        sa2[rev_idx] = float('inf') if aa2 == 'Z' else -torch.log(probs2[rev_idx, amino_acid_position[aa2]])
+    except (KeyError, IndexError):
+        pass
 
-        # check for rev complements
-        try:
-            aa2 = codon_to_amino_acid[rev_codon]
-            if aa2 == 'Z':  # If it's a stop codon, assign maximum penalty
-                sa2[i] = torch.tensor(float('inf'), dtype=torch.float32)
-            else:
-                aa2 = 'X' if aa2 == 'Z' else aa2  # This line is now redundant but kept for safety
-                idx2 = amino_acid_position[aa2]
-                aa2_arr[n] = idx2
-                sa2[i] = -torch.log(probs2[i, idx2])
-        except (KeyError, IndexError):
-            pass
+    if debug:
+        print(f"[DEBUG] fwd_idx={fwd_idx}, fwd_codon={seq1[fwd_idx*3:fwd_idx*3+3]}, sa1={sa1[fwd_idx]}")
+        print(f"[DEBUG] rev_idx={rev_idx}, rev_codon={seq2[rev_idx*3:rev_idx*3+3]}, sa2={sa2[rev_idx]}")
 
     return sa1, sa2
-
-def find_zs(fwd_sequence, rev_sequence, num_codons):
-    aa_list1, aa_list2, fwd_zs, rev_zs = [], [], [], []
-    for i in range(num_codons):
-        fwd_codon = fwd_sequence[i * 3: i * 3 + 3]
-        rev_codon = rev_sequence[i * 3: i * 3 + 3]
-        aa_list1 += codon_to_amino_acid[fwd_codon]
-        aa_list2 += codon_to_amino_acid[rev_codon]
-        if codon_to_amino_acid[fwd_codon] == 'Z':
-            fwd_zs.append(i)
-        if codon_to_amino_acid[rev_codon] == 'Z':
-            rev_zs.append(i)
-    return fwd_zs, rev_zs, aa_list1, aa_list2
     
-'''
-def z_mutator(fwd_sequence, rev_sequence, num_codons, shift):
-    """
-    Removes stop codons from the sequences and returns the modified sequences without caring about scores.
-    Useful to prevent the algorithm from getting stuck in a local minimum with stop codons.
-    """
-    fwd_zs, rev_zs, aa_list1, aa_list2  = find_zs(fwd_sequence, rev_sequence, num_codons)
-    zs_exist = len(fwd_zs) > 0 or len(rev_zs) > 0
-    while zs_exist:
-        for i in fwd_zs:
-            fwd_sequence = fwd_sequence[:i * 3] + 'C' + fwd_sequence[i * 3 + 1:]
-            rev_sequence = rev_sequence[:len(rev_sequence) - i * 3] + 'G' + rev_sequence[len(rev_sequence) - i * 3 + 1:]
-        for i in rev_zs:
-            rev_sequence = rev_sequence[:i * 3] + 'C' + rev_sequence[i * 3 + 1:]
-            fwd_sequence = fwd_sequence[:len(fwd_sequence) - i * 3] + 'G' + fwd_sequence[len(fwd_sequence) - i * 3 + 1:]
-        fwd_zs, rev_zs, aa_list1, aa_list2 = find_zs(fwd_sequence, rev_sequence, num_codons)
-        zs_exist = len(fwd_zs) > 0 or len(rev_zs) > 0
-    # If we removed all stop codons, return the modified sequences
-
-    return fwd_sequence, rev_sequence
-'''
-
 
 # Define Dictionary of Amino Acids
 codon_to_amino_acid = {
@@ -220,18 +241,25 @@ def na_sample(probs1, probs2):
     metro_file = os.path.join(os.getcwd(), 'metro.flags')
     if not os.path.isfile(metro_file):
         raise ValueError(f"Missing flag file expected at {metro_file}")
-    strand, shift, temperature, use_gradient, gradient_start, gradient_end, num_mutations, metropolis = run_metropolis_from_flags(metro_file)
+    strand, shift, temperature, use_gradient, gradient_start, gradient_end, num_mutations, metropolis, overhang_residues = run_metropolis_from_flags(metro_file)
 
     # Ensure that the two proteins have the same length
     if probs1.shape != probs2.shape:
         raise ValueError('Tables must have the same shape')
+
+    if strand == 'same':
+        sample_all_function = sample_all_same_strand
+        score_function = score
+    else:
+        sample_all_function = sample_all
+        score_function = score
 
     # Fill in penalty for stop codon using "X" position in prob arrays
     stop_penalty = 10000 # should be as large as possible 
 
     # The number of codons in the pair of proteins
     num_codons = probs1.shape[0] 
-    num_nas = num_codons * 3 + shift # +1 for single frame shift, +2 for double frame shift
+    num_nas = num_codons * 3 + shift + overhang_residues * 3 # +1 for single frame shift, +2 for double frame shift, +3 per overhang base
 
     temp_list = []
     if use_gradient:
@@ -258,10 +286,10 @@ def na_sample(probs1, probs2):
     # Do initial scoring for baseline values
     probs1, probs2 = probs1.to('cpu'), probs2.to('cpu')
 
-    init1 = torch.full((num_codons,), dtype=torch.float, device='cpu', fill_value=torch.inf)
-    init2 = torch.full((num_codons,), dtype=torch.float, device='cpu', fill_value=torch.inf)
-    codons = torch.arange(num_codons, dtype=torch.long, device='cpu')
-    score_array1, score_array2 = score(fwd_sequence, rev_sequence, probs1, probs2, codons, shift, init1, init2, stop_penalty)
+    #init1 = torch.full((num_codons,), dtype=torch.float, device='cpu', fill_value=torch.inf)
+    #init2 = torch.full((num_codons,), dtype=torch.float, device='cpu', fill_value=torch.inf)
+    #codons = torch.arange(num_codons, dtype=torch.long, device='cpu')
+    score_array1, score_array2 = score_all_codons(fwd_sequence, rev_sequence, probs1, probs2)
     score1, score2 = torch.sum(score_array1), torch.sum(score_array2)
     score_overall = (score1 * score2)
     best_iter = 0
@@ -277,7 +305,7 @@ def na_sample(probs1, probs2):
             position = np.random.randint(0, num_nas)
             char = fwd_sequence[position]
 
-            score_arrays1, score_arrays2, sequence_list1, sequence_list2 = sample_all(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2, stop_penalty)
+            score_arrays1, score_arrays2, sequence_list1, sequence_list2 = sample_all_function(position, num_nas, shift, fwd_sequence, rev_sequence, probs1, probs2, score_array1, score_array2)
 
             # Compute combined scores with each given mutation set
             scores1 = torch.tensor([torch.sum(arr) for arr in score_arrays1])
@@ -444,6 +472,7 @@ def run_metropolis_from_flags(flags_file):
     # Use the arguments to perform your logic
     strand = args.get("strand", 'opposite')
     shift = args.get("shift", 1)
+    overhang_residues = args.get("overhang_residues", 0) #Number of bases on the 5' and 3' ends of the first and second proteins that do not overlap
     temperature = args.get("temperature", 0.007) #Accepts ~5 percent of the sampled data
     use_gradient = args.get("use_gradient", False)
     gradient_start = args.get("gradient_start", 0.5) #Accepts ~55 percent of the sampled data
@@ -453,4 +482,4 @@ def run_metropolis_from_flags(flags_file):
 
     print('Using Updated Version of Metropolis Sampler')
     print(f"Running metropolis with strand={strand}, shift={shift}, temperature={temperature}, use_gradient={use_gradient}, gradient_start={gradient_start}, gradient_end={gradient_end}, num_mutations={num_mutations}, metropolis={metropolis}")
-    return(strand, shift, temperature, use_gradient, gradient_start, gradient_end, num_mutations, metropolis)    
+    return(strand, shift, temperature, use_gradient, gradient_start, gradient_end, num_mutations, metropolis, overhang_residues)    
